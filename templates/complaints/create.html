@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Complaint - Smart City CMS{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="row justify-content-center">
+
+        <div class="col-md-8">
+
+            <div class="card shadow">
+
+                <div class="card-body">
+
+                    <h2 class="mb-4">
+                        <i class="bi bi-plus-circle"></i>
+                        Submit a Complaint
+                    </h2>
+
+                    <form
+                        method="POST"
+                        enctype="multipart/form-data"
+                    >
+
+                        <!-- TITLE -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Complaint Title
+                            </label>
+                            <input
+                                type="text"
+                                name="title"
+                                class="form-control"
+                                placeholder="Example: Large pothole near college"
+                            >
+                        </div>
+
+                        <!-- DESCRIPTION -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Describe the Problem *
+                            </label>
+                            <textarea
+                                name="description"
+                                class="form-control"
+                                rows="5"
+                                placeholder="Describe your civic problem clearly..."
+                                required
+                            ></textarea>
+                            <small class="text-muted">
+                                Be as detailed as possible. Our AI will analyze your description.
+                            </small>
+                        </div>
+
+                        <!-- LOCATION -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Location
+                            </label>
+                            <input
+                                type="text"
+                                name="location"
+                                class="form-control"
+                                placeholder="Example: Near Sathyabama University, Chennai"
+                            >
+                        </div>
+
+                        <!-- LAT/LONG -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Latitude</label>
+                                <input
+                                    type="text"
+                                    name="latitude"
+                                    id="latitude"
+                                    class="form-control"
+                                    placeholder="Auto-detect or enter manually"
+                                >
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Longitude</label>
+                                <input
+                                    type="text"
+                                    name="longitude"
+                                    id="longitude"
+                                    class="form-control"
+                                    placeholder="Auto-detect or enter manually"
+                                >
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm mb-3"
+                            onclick="detectLocation()"
+                        >
+                            <i class="bi bi-geo-alt"></i> Detect My Location
+                        </button>
+
+                        <!-- IMAGE -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Upload Photo
+                            </label>
+                            <input
+                                type="file"
+                                name="image"
+                                class="form-control"
+                                accept=".jpg,.jpeg,.png,.webp"
+                                id="imageInput"
+                            >
+                            <small class="text-muted">
+                                JPG, JPEG, PNG or WEBP. Our AI will analyze the image.
+                            </small>
+                            <div id="imagePreview" class="mt-2" style="display:none;">
+                                <img id="previewImg" class="img-fluid rounded" style="max-height: 200px;">
+                            </div>
+                        </div>
+
+                        <!-- VIDEO -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">
+                                Upload Video
+                            </label>
+                            <input
+                                type="file"
+                                name="video"
+                                class="form-control"
+                                accept=".mp4,.avi,.mov,.mkv"
+                            >
+                            <small class="text-muted">
+                                MP4, AVI, MOV or MKV (max 50MB)
+                            </small>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="btn btn-primary w-100 btn-lg"
+                        >
+                            <i class="bi bi-send"></i>
+                            Submit Complaint
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function detectLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            document.getElementById('latitude').value = position.coords.latitude.toFixed(7);
+            document.getElementById('longitude').value = position.coords.longitude.toFixed(7);
+        }, function(error) {
+            alert('Unable to detect location: ' + error.message);
+        });
+    } else {
+        alert('Geolocation is not supported by this browser.');
+    }
+}
+
+document.getElementById('imageInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('previewImg').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+});
+</script>
+{% endblock %}

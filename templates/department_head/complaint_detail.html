@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}Complaint #{{ complaint.complaint_id }}{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi bi-file-earmark-text"></i>
+                Complaint #{{ complaint.complaint_id }}
+            </h2>
+            <p class="text-muted">
+                Department Head Review
+            </p>
+        </div>
+
+        <a href="{{ url_for('department_head.all_complaints') }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+
+
+    <!-- Complaint Information -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-info-circle"></i>
+            Complaint Details
+        </div>
+
+        <div class="card-body">
+
+            <h4>{{ complaint.title or 'Untitled Complaint' }}</h4>
+
+            <p class="mt-3">
+                {{ complaint.description }}
+            </p>
+
+            <hr>
+
+            <div class="row">
+
+                <div class="col-md-4">
+                    <strong>Category</strong>
+                    <p>{{ complaint.category or '-' }}</p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Priority</strong>
+                    <p>
+                        <span class="badge {{ get_priority_badge(complaint.priority) }}">
+                            {{ complaint.priority }}
+                        </span>
+                    </p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Status</strong>
+                    <p>
+                        <span class="badge {{ get_status_badge(complaint.status) }}">
+                            {{ complaint.status }}
+                        </span>
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="row">
+
+                <div class="col-md-6">
+                    <strong>Location</strong>
+                    <p>{{ complaint.location or '-' }}</p>
+                </div>
+
+                <div class="col-md-6">
+                    <strong>Created</strong>
+                    <p>
+                        {{ complaint.created_at.strftime('%d %b %Y %I:%M %p')
+                           if complaint.created_at else '-' }}
+                    </p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- AI Analysis -->
+    {% if ai_result %}
+
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-info text-white">
+            <i class="bi bi-robot"></i>
+            AI Analysis
+        </div>
+
+        <div class="card-body">
+
+            <div class="row">
+
+                <div class="col-md-4">
+                    <strong>AI Category</strong>
+                    <p>{{ ai_result.category or '-' }}</p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>AI Priority</strong>
+                    <p>{{ ai_result.priority or '-' }}</p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Confidence</strong>
+                    <p>{{ ai_result.confidence or '-' }}</p>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+    <!-- Assignment -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header bg-success text-white">
+            <i class="bi bi-person-check"></i>
+            Assign Complaint to Officer
+        </div>
+
+        <div class="card-body">
+
+            {% if officers_workload %}
+
+            <form method="POST"
+                  action="{{ url_for(
+                      'department_head.assign_officer',
+                      complaint_id=complaint.complaint_id
+                  ) }}">
+
+                <div class="mb-3">
+
+                    <label class="form-label fw-bold">
+                        Select Officer
+                    </label>
+
+                    <select name="officer_id"
+                            class="form-select"
+                            required>
+
+                        <option value="">
+                            -- Select Normal Officer --
+                        </option>
+
+                        {% for item in officers_workload %}
+
+                        <option value="{{ item.officer_id }}">
+
+                            {{ item.name }}
+                            —
+                            Active Workload: {{ item.active_workload }}
+                            —
+                            Resolved: {{ item.resolved }}
+
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <div class="mb-3">
+
+                    <label class="form-label fw-bold">
+                        Assignment Reason
+                    </label>
+
+                    <textarea name="reason"
+                              class="form-control"
+                              rows="3"
+                              placeholder="Why is this complaint being assigned to this officer?"></textarea>
+
+                </div>
+
+
+                <button type="submit"
+                        class="btn btn-success">
+
+                    <i class="bi bi-person-check-fill"></i>
+                    Assign Complaint
+
+                </button>
+
+            </form>
+
+            {% else %}
+
+            <div class="alert alert-warning mb-0">
+
+                <i class="bi bi-exclamation-triangle"></i>
+
+                No normal officers are available in this department.
+
+            </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- Current Assignment -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+            <i class="bi bi-person-badge"></i>
+            Current Assignment
+        </div>
+
+        <div class="card-body">
+
+            {% if complaint.assigned_officer_id %}
+
+                <p class="mb-0">
+                    Assigned Officer ID:
+                    <strong>
+                        #{{ complaint.assigned_officer_id }}
+                    </strong>
+                </p>
+
+            {% else %}
+
+                <p class="text-muted mb-0">
+                    This complaint is currently not assigned to an officer.
+                </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- History -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+            <i class="bi bi-clock-history"></i>
+            Complaint History
+        </div>
+
+        <div class="card-body">
+
+            {% if history %}
+
+            <div class="list-group">
+
+                {% for h in history %}
+
+                <div class="list-group-item">
+
+                    <strong>{{ h.action }}</strong>
+
+                    {% if h.remarks %}
+                    <p class="mb-1 text-muted">
+                        {{ h.remarks }}
+                    </p>
+                    {% endif %}
+
+                    <small class="text-muted">
+                        {{ h.created_at.strftime('%d %b %Y %I:%M %p')
+                           if h.created_at else '' }}
+                    </small>
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            {% else %}
+
+            <p class="text-muted mb-0">
+                No history available.
+            </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Admin{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h2 class="mb-4"><i class="bi bi-bar-chart"></i> Analytics Dashboard</h2>
+
+    <div class="row">
+
+        <!-- By Category -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-tags"></i> By Category</div>
+                <div class="card-body">
+                    {% for cat, count in categories %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>{{ cat or 'Unknown' }}</small>
+                            <small class="fw-bold">{{ count }}</small>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-info" style="width: {{ (count * 100 / total_categories)|round }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- By Status -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-check2-square"></i> By Status</div>
+                <div class="card-body">
+                    {% for status, count in statuses %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge {{ get_status_badge(status) }}">{{ status }}</span>
+                        <span class="badge bg-dark rounded-pill">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- By Priority -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-exclamation-triangle"></i> By Priority</div>
+                <div class="card-body">
+                    {% for priority, count in priorities %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="badge {{ get_priority_badge(priority) }}">{{ priority }}</span>
+                        <span class="badge bg-dark rounded-pill">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- By Department -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header"><i class="bi bi-diagram-3"></i> Department Workload</div>
+                <div class="card-body">
+                    {% for dept, count in dept_stats %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between mb-1">
+                            <small>{{ dept or 'Unassigned' }}</small>
+                            <small class="fw-bold">{{ count }}</small>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-primary" style="width: {{ (count * 100 / total_dept_stats)|round }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

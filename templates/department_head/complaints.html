@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Department Complaints{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi bi-list-check"></i>
+                Department Complaints
+            </h2>
+            <p class="text-muted mb-0">
+                Review and assign complaints to your department officers.
+            </p>
+        </div>
+
+        <a href="{{ url_for('department_head.dashboard') }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+            Dashboard
+        </a>
+    </div>
+
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+
+        <div class="card-header">
+            <i class="bi bi-funnel"></i>
+            Filter Complaints
+        </div>
+
+        <div class="card-body">
+
+            <form method="GET"
+                  action="{{ url_for('department_head.all_complaints') }}"
+                  class="row g-3">
+
+                <div class="col-md-3">
+
+                    <label class="form-label">Status</label>
+
+                    <select name="status" class="form-select">
+
+                        <option value="">All Statuses</option>
+
+                        {% for status in [
+                            "SUBMITTED",
+                            "AI_ANALYZING",
+                            "UNDER_REVIEW",
+                            "ASSIGNED",
+                            "ACCEPTED",
+                            "IN_PROGRESS",
+                            "WAITING_FOR_CITIZEN",
+                            "RESOLVED",
+                            "REOPENED",
+                            "ESCALATED",
+                            "CLOSED",
+                            "REJECTED"
+                        ] %}
+
+                        <option value="{{ status }}"
+                            {% if status_filter == status %}selected{% endif %}>
+                            {{ status }}
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <label class="form-label">Priority</label>
+
+                    <select name="priority" class="form-select">
+
+                        <option value="">All Priorities</option>
+
+                        <option value="LOW"
+                            {% if priority_filter == "LOW" %}selected{% endif %}>
+                            LOW
+                        </option>
+
+                        <option value="MEDIUM"
+                            {% if priority_filter == "MEDIUM" %}selected{% endif %}>
+                            MEDIUM
+                        </option>
+
+                        <option value="HIGH"
+                            {% if priority_filter == "HIGH" %}selected{% endif %}>
+                            HIGH
+                        </option>
+
+                        <option value="CRITICAL"
+                            {% if priority_filter == "CRITICAL" %}selected{% endif %}>
+                            CRITICAL
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <label class="form-label">Officer</label>
+
+                    <select name="officer_id" class="form-select">
+
+                        <option value="">All Officers</option>
+
+                        <option value="unassigned"
+                            {% if officer_filter == "unassigned" %}selected{% endif %}>
+                            Unassigned
+                        </option>
+
+                        {% for officer in officers %}
+
+                        <option value="{{ officer.user_id }}"
+                            {% if officer_filter == officer.user_id|string %}selected{% endif %}>
+                            {{ officer.name }}
+                        </option>
+
+                        {% endfor %}
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-md-3">
+
+                    <label class="form-label">AI Review</label>
+
+                    <select name="review_flag" class="form-select">
+
+                        <option value="">All Complaints</option>
+
+                        <option value="1"
+                            {% if review_flag == "1" %}selected{% endif %}>
+                            Requires AI Review
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="col-12">
+
+                    <button type="submit"
+                            class="btn btn-primary">
+
+                        <i class="bi bi-search"></i>
+                        Apply Filters
+
+                    </button>
+
+                    <a href="{{ url_for('department_head.all_complaints') }}"
+                       class="btn btn-outline-secondary">
+
+                        Clear
+
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+    <!-- Complaints -->
+    <div class="card shadow-sm">
+
+        <div class="card-header d-flex justify-content-between align-items-center">
+
+            <span>
+                <i class="bi bi-file-earmark-text"></i>
+                Complaints
+            </span>
+
+            <span class="badge bg-primary">
+                {{ complaints|length }}
+            </span>
+
+        </div>
+
+
+        <div class="table-responsive">
+
+            <table class="table table-hover align-middle mb-0">
+
+                <thead class="table-light">
+
+                    <tr>
+                        <th>ID</th>
+                        <th>Complaint</th>
+                        <th>Category</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned Officer</th>
+                        <th>Action</th>
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    {% for complaint in complaints %}
+
+                    <tr>
+
+                        <td>
+                            <strong>
+                                #{{ complaint.complaint_id }}
+                            </strong>
+                        </td>
+
+
+                        <td>
+
+                            <div class="fw-bold">
+                                {{ complaint.title or "Untitled Complaint" }}
+                            </div>
+
+                            <small class="text-muted">
+                                {{ complaint.location or "Location not provided" }}
+                            </small>
+
+                        </td>
+
+
+                        <td>
+                            {{ complaint.category or "-" }}
+                        </td>
+
+
+                        <td>
+
+                            <span class="badge {{ get_priority_badge(complaint.priority) }}">
+                                {{ complaint.priority }}
+                            </span>
+
+                        </td>
+
+
+                        <td>
+
+                            <span class="badge {{ get_status_badge(complaint.status) }}">
+                                {{ complaint.status }}
+                            </span>
+
+                        </td>
+
+
+                        <td>
+
+                            {% if complaint.assigned_officer_id %}
+
+                                <span class="badge bg-success">
+                                    Officer #{{ complaint.assigned_officer_id }}
+                                </span>
+
+                            {% else %}
+
+                                <span class="text-muted">
+                                    Not Assigned
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+
+                            <a href="{{ url_for(
+                                'department_head.complaint_detail',
+                                complaint_id=complaint.complaint_id
+                            ) }}"
+                            class="btn btn-sm btn-primary">
+
+                                <i class="bi bi-eye"></i>
+                                Review
+
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+
+                        <td colspan="7"
+                            class="text-center py-5">
+
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+
+                            <p class="text-muted mt-2 mb-0">
+                                No complaints found.
+                            </p>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

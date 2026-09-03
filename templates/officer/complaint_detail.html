@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Complaint #{{ complaint.complaint_id }} - Officer View{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-file-text"></i>
+            Complaint #{{ complaint.complaint_id }}
+        </h2>
+        <div>
+            <span class="badge {{ get_status_badge(complaint.status) }} fs-6 me-2">{{ complaint.status }}</span>
+            <span class="badge {{ get_priority_badge(complaint.priority) }} fs-6">{{ complaint.priority }}</span>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <!-- LEFT: Details -->
+        <div class="col-md-8">
+
+            <div class="card mb-4">
+                <div class="card-header"><i class="bi bi-info-circle"></i> Complaint Details</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="detail-label">Title</div>
+                        <div class="detail-value">{{ complaint.title or "No title" }}</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="detail-label">Description</div>
+                        <div class="detail-value">{{ complaint.description }}</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">{{ complaint.location or "Not provided" }}</div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="detail-label">Category</div>
+                            <span class="badge bg-info">{{ complaint.category }}</span>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="detail-label">Citizen</div>
+                            <div class="detail-value">{{ complaint.user.name if complaint.user else 'N/A' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Media -->
+            {% if complaint.media %}
+            <div class="card mb-4">
+                <div class="card-header"><i class="bi bi-image"></i> Uploaded Media</div>
+                <div class="card-body">
+                    <div class="row">
+                    {% for m in complaint.media %}
+                        <div class="col-md-6 mb-3">
+                            {% if m.file_type == 'IMAGE' %}
+                                <img src="/{{ m.file_path }}" class="img-fluid rounded">
+                            {% elif m.file_type == 'VIDEO' %}
+                                <video controls class="w-100 rounded">
+                                    <source src="/{{ m.file_path }}">
+                                </video>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- AI Analysis -->
+            {% if ai_result %}
+            <div class="card ai-analysis-card mb-4">
+                <div class="card-header bg-transparent"><i class="bi bi-robot"></i> AI Analysis</div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3"><small class="text-muted">Intent</small><br>{{ ai_result.intent }}</div>
+                        <div class="col-md-3"><small class="text-muted">Category</small><br>{{ ai_result.detected_category }}</div>
+                        <div class="col-md-3"><small class="text-muted">Urgency</small><br>{{ ai_result.urgency }}</div>
+                        <div class="col-md-3"><small class="text-muted">Sentiment</small><br>{{ ai_result.sentiment }}</div>
+                    </div>
+                    {% if ai_result.vision_issue %}
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-3"><small class="text-muted">Vision Issue</small><br>{{ ai_result.vision_issue }}</div>
+                        <div class="col-md-3"><small class="text-muted">Severity</small><br>{{ ai_result.vision_severity }}</div>
+                        <div class="col-md-3"><small class="text-muted">Vision Dept</small><br>{{ ai_result.vision_department }}</div>
+                        <div class="col-md-3"><small class="text-muted">Confidence</small><br>{{ ai_result.vision_confidence }}%</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Update Status Form -->
+            {% if complaint.status not in ['CLOSED', 'REJECTED'] %}
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-pencil-square"></i> Update Complaint Status
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('officer.update_status', complaint_id=complaint.complaint_id) }}">
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">New Status</label>
+                            <select name="status" class="form-select" required id="statusSelect">
+                                <option value="">Select Status</option>
+                                <option value="ACCEPTED">Accept Complaint</option>
+                                <option value="IN_PROGRESS">Mark In Progress</option>
+                                <option value="RESOLVED">Mark Resolved</option>
+                                <option value="WAITING_FOR_CITIZEN">Waiting for Citizen</option>
+                                <option value="REJECTED">Reject Complaint</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3" id="resolutionDiv" style="display:none;">
+                            <label class="form-label fw-bold">Resolution Description *</label>
+                            <textarea name="resolution_description" class="form-control" rows="3"
+                                placeholder="Describe what was done to resolve the issue..."></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Remarks / Notes</label>
+                            <textarea name="remarks" class="form-control" rows="2"
+                                placeholder="Optional notes..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Update Status
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- RIGHT: Timeline -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header"><i class="bi bi-clock-history"></i> Timeline</div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for h in history %}
+                        <div class="timeline-item">
+                            <div class="timeline-dot {% if loop.last %}active{% else %}completed{% endif %}"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">{{ h.new_status }}</div>
+                                <div class="small">{{ h.action }}</div>
+                                {% if h.remarks %}
+                                <div class="small text-muted fst-italic">{{ h.remarks }}</div>
+                                {% endif %}
+                                <div class="timeline-date">
+                                    {{ h.created_at.strftime('%d %b %I:%M %p') if h.created_at else '' }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('statusSelect').addEventListener('change', function() {
+    var resDiv = document.getElementById('resolutionDiv');
+    resDiv.style.display = this.value === 'RESOLVED' ? 'block' : 'none';
+});
+</script>
+{% endblock %}

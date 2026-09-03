@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}All Complaints - Admin{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h2 class="mb-4"><i class="bi bi-list-ul"></i> All Complaints</h2>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <select name="status" class="form-select">
+                        <option value="">All Statuses</option>
+                        {% for s in ['SUBMITTED','UNDER_REVIEW','ASSIGNED','ACCEPTED','IN_PROGRESS','RESOLVED','CLOSED','REJECTED','REOPENED','ESCALATED'] %}
+                        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="priority" class="form-select">
+                        <option value="">All Priorities</option>
+                        {% for p in ['LOW','MEDIUM','HIGH','CRITICAL'] %}
+                        <option value="{{ p }}" {% if priority_filter == p %}selected{% endif %}>{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select name="department" class="form-select">
+                        <option value="">All Departments</option>
+                        {% for d in departments %}
+                        <option value="{{ d.department_id }}" {% if dept_filter == d.department_id|string %}selected{% endif %}>
+                            {{ d.department_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-funnel"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Complaints Table -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Citizen</th>
+                    <th>Category</th>
+                    <th>Department</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in complaints %}
+                <tr>
+                    <td><strong>#{{ c.complaint_id }}</strong></td>
+                    <td>{{ c.title or c.description[:30] }}</td>
+                    <td>{{ c.user.name if c.user else 'N/A' }}</td>
+                    <td><span class="badge bg-info">{{ c.category }}</span></td>
+                    <td>{{ c.department.department_name if c.department else 'Pending' }}</td>
+                    <td><span class="badge {{ get_status_badge(c.status) }}">{{ c.status }}</span></td>
+                    <td><span class="badge {{ get_priority_badge(c.priority) }}">{{ c.priority }}</span></td>
+                    <td><small>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-muted">Total: {{ complaints|length }} complaints</p>
+
+</div>
+
+{% endblock %}

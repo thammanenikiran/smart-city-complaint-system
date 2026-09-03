@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}My Complaints - Smart City CMS{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-list-check"></i> My Complaints
+        </h2>
+        <a href="{{ url_for('complaint.create_complaint') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> New Complaint
+        </a>
+    </div>
+
+    {% if complaints %}
+
+    <div class="table-responsive">
+
+        <table class="table table-hover">
+
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Department</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Date</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for c in complaints %}
+                <tr>
+                    <td><strong>#{{ c.complaint_id }}</strong></td>
+
+                    <td>{{ c.title or c.description[:50] }}</td>
+
+                    <td>
+                        <span class="badge bg-info">
+                            {{ c.category or "Pending" }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {% if c.department %}
+                            {{ c.department.department_name }}
+                        {% else %}
+                            <span class="text-muted">Pending</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span class="badge {{ get_status_badge(c.status) }}">
+                            {{ c.status }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <span class="badge {{ get_priority_badge(c.priority) }}">
+                            {{ c.priority }}
+                        </span>
+                    </td>
+
+                    <td>
+                        <small>{{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }}</small>
+                    </td>
+
+                    <td>
+                        <a
+                            href="{{ url_for('complaint.complaint_detail', complaint_id=c.complaint_id) }}"
+                            class="btn btn-sm btn-outline-primary"
+                        >
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    {% else %}
+
+    <div class="alert alert-info text-center mt-4">
+        <i class="bi bi-info-circle"></i>
+        You have not submitted any complaints yet.
+        <a href="{{ url_for('complaint.create_complaint') }}">Submit your first complaint</a>.
+    </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

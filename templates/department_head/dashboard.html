@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Department Head Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi bi-building"></i>
+                Department Head Dashboard
+            </h2>
+
+            <p class="text-muted mb-0">
+                {{ department.department_name }}
+            </p>
+        </div>
+
+        <div>
+            <span class="badge bg-primary">
+                Department Head
+            </span>
+        </div>
+    </div>
+
+
+    <!-- Statistics -->
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Total Complaints</h6>
+                    <h2>{{ total }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Pending Review</h6>
+                    <h2>{{ pending }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Assigned / Active</h6>
+                    <h2>{{ assigned }}</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h6 class="text-muted">Resolved</h6>
+                    <h2>{{ resolved }}</h2>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+
+    <!-- High Priority -->
+
+    <div class="alert alert-warning mb-4">
+        <strong>
+            <i class="bi bi-exclamation-triangle"></i>
+            High Priority:
+        </strong>
+
+        {{ high_priority }} complaint(s) require attention.
+    </div>
+
+
+    <!-- Officers -->
+
+    <!-- Officers -->
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-people"></i>
+            Department Officers
+        </span>
+
+        <a href="{{ url_for('department_head.officers') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-person-plus"></i>
+            Manage Officers
+        </a>
+    </div>
+
+        <div class="card-body">
+
+            {% if officers_workload %}
+
+<div class="table-responsive">
+
+    <table class="table table-hover">
+
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Active Workload</th>
+                <th>Resolved</th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+            {% for officer_data in officers_workload %}
+
+            <tr>
+                <td>
+                    <strong>{{ officer_data.name }}</strong>
+                </td>
+
+                <td>
+                    {{ officer_data.email }}
+                </td>
+
+                <td>
+                    {{ officer_data.phone or '-' }}
+                </td>
+
+                <td>
+                    <span class="badge bg-primary">
+                        {{ officer_data.active_workload }}
+                    </span>
+                </td>
+
+                <td>
+                    <span class="badge bg-success">
+                        {{ officer_data.resolved }}
+                    </span>
+                </td>
+            </tr>
+
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% else %}
+            <p class="text-muted mb-0">
+                No officers are currently assigned to this department.
+            </p>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+
+    <!-- Recent Complaints -->
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+            <i class="bi bi-list-check"></i>
+            Recent Department Complaints
+        </div>
+
+        <div class="card-body">
+
+            {% if recent %}
+
+            <div class="table-responsive">
+
+                <table class="table table-hover align-middle">
+
+                    <thead>
+
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Assigned Officer</th>
+                        </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                        {% for complaint in recent %}
+
+                        <tr>
+
+                            <td>
+                                #{{ complaint.complaint_id }}
+                            </td>
+
+                            <td>
+                                {{ complaint.title or 'Untitled Complaint' }}
+                            </td>
+
+                            <td>
+                                {{ complaint.category or '-' }}
+                            </td>
+
+                            <td>
+
+                                {% if complaint.priority == "CRITICAL" %}
+                                    <span class="badge bg-danger">
+                                        CRITICAL
+                                    </span>
+
+                                {% elif complaint.priority == "HIGH" %}
+                                    <span class="badge bg-warning text-dark">
+                                        HIGH
+                                    </span>
+
+                                {% elif complaint.priority == "MEDIUM" %}
+                                    <span class="badge bg-info">
+                                        MEDIUM
+                                    </span>
+
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        LOW
+                                    </span>
+
+                                {% endif %}
+
+                            </td>
+
+                            <td>
+
+                                <span class="badge bg-secondary">
+                                    {{ complaint.status }}
+                                </span>
+
+                            </td>
+
+                            <td>
+
+                                {% if complaint.assigned_officer_id %}
+
+                                    Officer #{{ complaint.assigned_officer_id }}
+
+                                {% else %}
+
+                                    <span class="text-muted">
+                                        Not Assigned
+                                    </span>
+
+                                {% endif %}
+
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% else %}
+
+            <div class="text-center py-4">
+
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+
+                <p class="text-muted mt-2">
+                    No complaints found for this department.
+                </p>
+
+            </div>
+
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,13 @@
+venv/
+me/
+__pycache__/
+.env
+*.pyc
+uploads/
+*.pt
+runs/
+dataset/
+test_images/
+# Deployment / local files
+.railway/
+railway.json

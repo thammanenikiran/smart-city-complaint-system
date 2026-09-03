@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Users - Admin{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-people"></i> Manage Users
+        </h2>
+        <div>
+            <span class="badge bg-secondary">Total: {{ users|length }}</span>
+        </div>
+    </div>
+
+    <!-- Create User Card -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-person-plus-fill me-1"></i> Create New User
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.create_user') }}" id="createUserForm">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Full Name *</label>
+                        <input type="text" name="name" class="form-control" placeholder="e.g. John Doe" required>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Email Address *</label>
+                        <input type="email" name="email" class="form-control" placeholder="e.g. john@smartcity.gov" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Phone</label>
+                        <input type="text" name="phone" class="form-control" placeholder="e.g. 9876543210">
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Password *</label>
+                        <input type="password" name="password" class="form-control" placeholder="Password" required>
+                    </div>
+
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold">Role *</label>
+                        <select name="role" id="roleSelect" class="form-select" required>
+                            <option value="CITIZEN">Citizen</option>
+                            <option value="OFFICER">Officer</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+
+                    <!-- Department Selection (Visible only for Officers) -->
+                    <div class="col-md-4" id="deptGroup" style="display: none;">
+                        <label class="form-label fw-bold">Department *</label>
+                        <select name="department_id" id="deptSelect" class="form-select">
+                            <option value="">-- Select Department --</option>
+                            {% for d in departments %}
+                            <option value="{{ d.department_id }}">{{ d.department_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Department Head Checkbox (Visible only for Officers) -->
+                    <div class="col-md-4 align-self-center" id="deptHeadGroup" style="display: none;">
+                        <div class="form-check mt-3 pt-2">
+                            <input class="form-check-input" type="checkbox" name="is_department_head" value="1" id="isDeptHead">
+                            <label class="form-check-label fw-bold text-primary" for="isDeptHead">
+                                <i class="bi bi-star-fill text-warning me-1"></i> Designate as Department Head
+                            </label>
+                        </div>
+                        <small class="text-muted d-block">Department heads review AI analyses and assign tasks to normal officers.</small>
+                    </div>
+
+                    <div class="col-12 mt-3">
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-person-check-fill me-1"></i> Create User
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Users Table Card -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <span class="fw-bold"><i class="bi bi-list-ul me-1"></i> Registered System Users</span>
+            <div class="d-flex gap-2">
+                <input type="text" id="userSearchInput" class="form-control form-control-sm" placeholder="Search by name, email...">
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="usersTable">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 70px;">ID</th>
+                        <th>User Details</th>
+                        <th>Role & Position</th>
+                        <th>Department</th>
+                        <th>Joined Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td><strong>#{{ u.user_id }}</strong></td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ u.name }}</div>
+                            <div class="small text-muted">{{ u.email }}{% if u.phone %} &bull; {{ u.phone }}{% endif %}</div>
+                        </td>
+                        <td>
+                            {% if u.role == 'ADMIN' %}
+                                <span class="badge bg-danger">
+                                    <i class="bi bi-shield-lock me-1"></i> System Admin
+                                </span>
+                            {% elif u.role == 'OFFICER' and u.is_department_head %}
+                                <span class="badge bg-warning text-dark">
+                                    <i class="bi bi-star-fill me-1"></i> Department Head
+                                </span>
+                            {% elif u.role == 'OFFICER' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-person-badge me-1"></i> Normal Officer
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-person me-1"></i> Citizen
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.department %}
+                                <span class="badge bg-light text-dark border">
+                                    <i class="bi bi-building me-1"></i> {{ u.department.department_name }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small class="text-muted">
+                                {{ u.created_at.strftime('%d %b %Y') if u.created_at else '-' }}
+                            </small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const roleSelect = document.getElementById('roleSelect');
+    const deptGroup = document.getElementById('deptGroup');
+    const deptSelect = document.getElementById('deptSelect');
+    const deptHeadGroup = document.getElementById('deptHeadGroup');
+    const isDeptHead = document.getElementById('isDeptHead');
+
+    function updateFormVisibility() {
+        if (roleSelect.value === 'OFFICER') {
+            deptGroup.style.display = 'block';
+            deptSelect.setAttribute('required', 'required');
+            deptHeadGroup.style.display = 'block';
+        } else {
+            deptGroup.style.display = 'none';
+            deptSelect.removeAttribute('required');
+            deptSelect.value = '';
+            deptHeadGroup.style.display = 'none';
+            isDeptHead.checked = false;
+        }
+    }
+
+    roleSelect.addEventListener('change', updateFormVisibility);
+    updateFormVisibility();
+
+    // Client-side search filter
+    const searchInput = document.getElementById('userSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#usersTable tbody tr');
+            rows.forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

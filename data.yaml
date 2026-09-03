@@ -1,0 +1,15 @@
+path: ./dataset
+
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: pothole
+  1: damaged_road
+  2: garbage
+  3: overflowing_bin
+  4: broken_streetlight
+  5: water_leakage
+  6: damaged_traffic_sign
+  7: fallen_tree

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>Manage Officers</h2>
+            <p class="text-muted">
+                Officers in your department
+            </p>
+        </div>
+
+        <a href="{{ url_for('department_head.create_officer') }}"
+           class="btn btn-primary">
+            + Create Officer
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-body">
+
+            {% if officers %}
+
+            <div class="table-responsive">
+
+                <table class="table table-bordered table-hover">
+
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Department</th>
+                            <th>Role</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                    {% for officer in officers %}
+
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ officer.name }}</td>
+                            <td>{{ officer.email }}</td>
+                            <td>{{ officer.department.name if officer.department else 'N/A' }}</td>
+                            <td>
+                                <span class="badge bg-success">
+                                    Officer
+                                </span>
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            {% else %}
+
+                <div class="text-center py-5">
+                    <h5>No officers found</h5>
+                    <p class="text-muted">
+                        Create your first officer for this department.
+                    </p>
+
+                    <a href="{{ url_for('department_head.create_officer') }}"
+                       class="btn btn-primary">
+                        Create Officer
+                    </a>
+                </div>
+
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

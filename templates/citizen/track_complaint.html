@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Track Complaint - Smart City CMS{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <h2 class="mb-4">
+        <i class="bi bi-search"></i> Track Complaint
+    </h2>
+
+    <!-- Search Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="POST" class="row g-3 align-items-end">
+                <div class="col-md-8">
+                    <label class="form-label fw-bold">Enter Complaint ID</label>
+                    <input type="number" name="complaint_id" class="form-control form-control-lg"
+                        placeholder="e.g. 1024" required>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-search"></i> Track
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if complaint %}
+
+    <!-- Complaint Info -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Complaint #{{ complaint.complaint_id }}</strong> — {{ complaint.title or complaint.description[:60] }}
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3 mb-2">
+                    <small class="text-muted d-block">Status</small>
+                    <span class="badge bg-info fs-6">{{ complaint.status }}</span>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <small class="text-muted d-block">Priority</small>
+                    <span class="badge bg-warning text-dark">{{ complaint.priority }}</span>
+                </div>
+                <div class="col-md-3 mb-2">
+                    <small class="text-muted d-block">Category</small>
+                    {{ complaint.category or "Pending" }}
+                </div>
+                <div class="col-md-3 mb-2">
+                    <small class="text-muted d-block">Department</small>
+                    {{ complaint.department.department_name if complaint.department else "Pending" }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline -->
+    {% if history %}
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-clock-history"></i> Complaint Timeline
+        </div>
+        <div class="card-body">
+            <div class="timeline">
+                {% for h in history %}
+                <div class="timeline-item">
+                    <div class="timeline-dot {% if loop.last %}active{% else %}completed{% endif %}"></div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">{{ h.new_status }}</div>
+                        <div class="small">{{ h.action }}</div>
+                        {% if h.remarks %}
+                        <div class="small text-muted fst-italic">{{ h.remarks }}</div>
+                        {% endif %}
+                        <div class="timeline-date">
+                            {{ h.created_at.strftime('%d %b %Y %I:%M %p') if h.created_at else '' }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="text-center mt-3">
+        <a href="{{ url_for('complaint.complaint_detail', complaint_id=complaint.complaint_id) }}"
+           class="btn btn-outline-primary">
+            <i class="bi bi-eye"></i> View Full Details
+        </a>
+    </div>
+
+    {% endif %}
+
+</div>
+
+{% endblock %}

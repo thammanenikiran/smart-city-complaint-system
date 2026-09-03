@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}Complaint #{{ complaint.complaint_id }} - Smart City CMS{% endblock %}
+
+{% block content %}
+
+<div class="container mt-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-file-text"></i>
+            Complaint #{{ complaint.complaint_id }}
+        </h2>
+        <div>
+            <span class="badge {{ get_status_badge(complaint.status) }} fs-6 me-2">
+                {{ complaint.status }}
+            </span>
+            <span class="badge {{ get_priority_badge(complaint.priority) }} fs-6">
+                {{ complaint.priority }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <!-- LEFT COLUMN: Complaint Details -->
+        <div class="col-md-8">
+
+            <!-- Complaint Info -->
+            <div class="card complaint-detail-card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Complaint Details
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <div class="detail-label">Title</div>
+                        <div class="detail-value">{{ complaint.title or "No title" }}</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="detail-label">Description</div>
+                        <div class="detail-value">{{ complaint.description }}</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="detail-label">Location</div>
+                            <div class="detail-value">{{ complaint.location or "Not provided" }}</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="detail-label">Department</div>
+                            <div class="detail-value">
+                                {{ complaint.department.department_name if complaint.department else "Pending" }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Category</div>
+                            <div class="detail-value">
+                                <span class="badge bg-info">{{ complaint.category or "Pending" }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Submitted</div>
+                            <div class="detail-value">
+                                {{ complaint.created_at.strftime('%d %b %Y %I:%M %p') if complaint.created_at else 'N/A' }}
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Duplicate</div>
+                            <div class="detail-value">
+                                {% if complaint.duplicate_of %}
+                                    <span class="badge bg-warning text-dark">
+                                        Similar to #{{ complaint.duplicate_of }}
+                                        ({{ complaint.duplicate_score }}%)
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">No</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if complaint.review_flag %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Review Flag:</strong> AI confidence is below threshold. This complaint needs manual review.
+                    </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            <!-- Media -->
+            {% if complaint.media %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-image"></i> Uploaded Media
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                    {% for m in complaint.media %}
+                        <div class="col-md-6 mb-3">
+                            {% if m.file_type == 'IMAGE' %}
+                                <img src="/{{ m.file_path }}" class="img-fluid rounded" alt="Complaint Image">
+                            {% elif m.file_type == 'VIDEO' %}
+                                <video controls class="w-100 rounded">
+                                    <source src="/{{ m.file_path }}">
+                                </video>
+                            {% endif %}
+                            <small class="text-muted d-block mt-1">{{ m.file_name }}</small>
+                        </div>
+                    {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- AI Analysis -->
+            {% if ai_result %}
+            <div class="card ai-analysis-card mb-4">
+                <div class="card-header bg-transparent">
+                    <i class="bi bi-robot"></i> AI Analysis
+                </div>
+                <div class="card-body">
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Intent</div>
+                            <div class="detail-value">{{ ai_result.intent }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Category</div>
+                            <div class="detail-value">
+                                <span class="badge bg-primary">{{ ai_result.detected_category }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Urgency</div>
+                            <div class="detail-value">{{ ai_result.urgency }}</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Sentiment</div>
+                            <div class="detail-value">{{ ai_result.sentiment }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Language</div>
+                            <div class="detail-value">{{ ai_result.language }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="detail-label">Confidence</div>
+                            <div class="detail-value">{{ ai_result.confidence }}%</div>
+                        </div>
+                    </div>
+
+                    {% if ai_result.summary %}
+                    <div class="mb-3">
+                        <div class="detail-label">AI Summary</div>
+                        <div class="detail-value fst-italic">"{{ ai_result.summary }}"</div>
+                    </div>
+                    {% endif %}
+
+                    {% if ai_result.vision_issue %}
+                    <hr>
+                    <h6><i class="bi bi-eye"></i> Vision Analysis (Gemini)</h6>
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <div class="detail-label">Issue</div>
+                            <div class="detail-value">{{ ai_result.vision_issue }}</div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <div class="detail-label">Severity</div>
+                            <div class="detail-value">{{ ai_result.vision_severity }}</div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <div class="detail-label">Department</div>
+                            <div class="detail-value">{{ ai_result.vision_department }}</div>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <div class="detail-label">Confidence</div>
+                            <div class="detail-value">{{ ai_result.vision_confidence }}%</div>
+                        </div>
+                    </div>
+                    {% if ai_result.vision_description %}
+                    <div class="mt-2">
+                        <div class="detail-label">Vision Description</div>
+                        <div class="detail-value">{{ ai_result.vision_description }}</div>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Resolution Info -->
+            {% if complaint.status == 'RESOLVED' and complaint.resolution_description %}
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-check-circle"></i> Resolution
+                </div>
+                <div class="card-body">
+                    <p>{{ complaint.resolution_description }}</p>
+                    {% if complaint.resolution_remarks %}
+                    <p class="text-muted"><strong>Remarks:</strong> {{ complaint.resolution_remarks }}</p>
+                    {% endif %}
+                    {% if complaint.resolved_at %}
+                    <small class="text-muted">
+                        Resolved on: {{ complaint.resolved_at.strftime('%d %b %Y %I:%M %p') }}
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Resolution Confirmation (for citizen) -->
+            {% if session.get('role') == 'CITIZEN' and complaint.status == 'RESOLVED' %}
+            <div class="card border-warning mb-4">
+                <div class="card-body text-center">
+                    <h5>Was your complaint resolved satisfactorily?</h5>
+                    <div class="d-flex justify-content-center gap-3 mt-3">
+                        <form method="POST" action="{{ url_for('complaint.confirm_resolution', complaint_id=complaint.complaint_id) }}">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-lg"></i> Confirm Resolution
+                            </button>
+                        </form>
+                        <button class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                            <i class="bi bi-x-lg"></i> Problem Not Solved
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reject Modal -->
+            <div class="modal fade" id="rejectModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form method="POST" action="{{ url_for('complaint.reject_resolution', complaint_id=complaint.complaint_id) }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Report Incorrect Resolution</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Why is the resolution incorrect?</label>
+                                    <textarea name="reason" class="form-control" rows="4" required
+                                        placeholder="Please explain why the problem was not resolved..."></textarea>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-danger">Submit & Reopen</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Feedback (for closed complaints) -->
+            {% if session.get('role') == 'CITIZEN' and complaint.status == 'CLOSED' and not feedback %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-star"></i> Submit Feedback
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('complaint.submit_feedback', complaint_id=complaint.complaint_id) }}">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Rating</label>
+                            <div class="d-flex gap-2">
+                                {% for i in range(1, 6) %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="rating" value="{{ i }}" id="rating{{ i }}">
+                                    <label class="form-check-label" for="rating{{ i }}">{{ '★' * i }}</label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Comment (Optional)</label>
+                            <textarea name="comment" class="form-control" rows="3" placeholder="Share your experience..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit Feedback</button>
+                    </form>
+                </div>
+            </div>
+            {% elif feedback %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-star-fill text-warning"></i> Your Feedback
+                </div>
+                <div class="card-body">
+                    <p>Rating: {{ '★' * feedback.rating }}{{ '☆' * (5 - feedback.rating) }}</p>
+                    {% if feedback.comment %}
+                    <p class="text-muted">"{{ feedback.comment }}"</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- RIGHT COLUMN: Timeline -->
+        <div class="col-md-4">
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-clock-history"></i> Complaint Timeline
+                </div>
+                <div class="card-body">
+
+                    <div class="timeline">
+                        {% for h in history %}
+                        <div class="timeline-item">
+                            <div class="timeline-dot {% if loop.last %}active{% else %}completed{% endif %}"></div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">
+                                    {{ h.new_status }}
+                                </div>
+                                <div class="small">{{ h.action }}</div>
+                                {% if h.remarks %}
+                                <div class="small text-muted fst-italic">{{ h.remarks }}</div>
+                                {% endif %}
+                                <div class="timeline-date">
+                                    {{ h.created_at.strftime('%d %b %Y %I:%M %p') if h.created_at else '' }}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if not history %}
+                    <p class="text-muted text-center">No history available.</p>
+                    {% endif %}
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
