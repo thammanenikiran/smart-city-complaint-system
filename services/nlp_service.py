@@ -7,7 +7,12 @@ from nltk.tokenize import word_tokenize
 
 
 # Load English stopwords
-STOP_WORDS = set(stopwords.words("english"))
+try:
+    STOP_WORDS = set(stopwords.words("english"))
+except LookupError:
+    import nltk
+    nltk.download("stopwords", quiet=True)
+    STOP_WORDS = set(stopwords.words("english"))
 
 
 def clean_text(text):
