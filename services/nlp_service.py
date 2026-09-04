@@ -4,6 +4,7 @@ from langdetect import detect, LangDetectException
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import nltk
 
 
 # Load English stopwords
@@ -13,6 +14,11 @@ except LookupError:
     import nltk
     nltk.download("stopwords", quiet=True)
     STOP_WORDS = set(stopwords.words("english"))
+
+try:
+    nltk.data.find("tokenizers/punkt_tab")
+except LookupError:
+    nltk.download("punkt_tab", quiet=True)
 
 
 def clean_text(text):
