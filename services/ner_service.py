@@ -1,12 +1,22 @@
-from transformers import pipeline
+
 
 
 # Load pre-trained BERT NER model
-ner_pipeline = pipeline(
-    "ner",
-    model="dslim/bert-base-NER",
-    aggregation_strategy="simple"
-)
+from transformers import pipeline
+
+ner_pipeline = None
+
+def get_ner_pipeline():
+    global ner_pipeline
+
+    if ner_pipeline is None:
+        ner_pipeline = pipeline(
+            "ner",
+            model="dslim/bert-base-NER",
+            aggregation_strategy="simple"
+        )
+
+    return ner_pipeline
 
 
 def extract_entities(text):
@@ -17,7 +27,7 @@ def extract_entities(text):
     if not text:
         return []
 
-    results = ner_pipeline(text)
+    results = get_ner_pipeline()(text)
 
     entities = []
 

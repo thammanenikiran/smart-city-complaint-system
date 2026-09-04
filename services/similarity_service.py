@@ -2,10 +2,18 @@ from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-# Load sentence embedding model
-embedding_model = SentenceTransformer(
-    "all-MiniLM-L6-v2"
-)
+embedding_model = None
+
+
+def get_embedding_model():
+    global embedding_model
+
+    if embedding_model is None:
+        embedding_model = SentenceTransformer(
+            "all-MiniLM-L6-v2"
+        )
+
+    return embedding_model
 
 
 def calculate_similarity(text1, text2):
@@ -16,7 +24,7 @@ def calculate_similarity(text1, text2):
     if not text1 or not text2:
         return 0.0
 
-    embeddings = embedding_model.encode(
+    embeddings = get_embedding_model().encode(
         [text1, text2]
     )
 

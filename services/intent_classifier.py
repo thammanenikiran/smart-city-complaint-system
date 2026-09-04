@@ -80,17 +80,22 @@ URGENCY_LABELS = [
 # ==========================================
 # BART MODEL
 # ==========================================
-
 classifier = None
 
-if pipeline is not None:
-    try:
-        classifier = pipeline(
-            "zero-shot-classification",
-            model="facebook/bart-large-mnli"
-        )
-    except Exception:
-        classifier = None
+
+def get_classifier():
+    global classifier
+
+    if classifier is None and pipeline is not None:
+        try:
+            classifier = pipeline(
+                "zero-shot-classification",
+                model="typeform/distilbert-base-uncased-mnli"
+            )
+        except Exception:
+            classifier = None
+
+    return classifier
 
 
 # ==========================================
@@ -104,6 +109,8 @@ def classify_intent(text):
             "intent": "REPORT_ISSUE",
             "confidence": 0.0
         }
+
+    classifier = get_classifier()
 
     if classifier is None:
         return {

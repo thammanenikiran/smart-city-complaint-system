@@ -1,11 +1,18 @@
 from transformers import pipeline
 
+sentiment_pipeline = None
 
-# Load pre-trained sentiment model
-sentiment_pipeline = pipeline(
-    "sentiment-analysis",
-    model="distilbert-base-uncased-finetuned-sst-2-english"
-)
+
+def get_sentiment_pipeline():
+    global sentiment_pipeline
+
+    if sentiment_pipeline is None:
+        sentiment_pipeline = pipeline(
+            "sentiment-analysis",
+            model="distilbert-base-uncased-finetuned-sst-2-english"
+        )
+
+    return sentiment_pipeline
 
 
 def analyze_sentiment(text):
@@ -19,7 +26,7 @@ def analyze_sentiment(text):
             "confidence": 0
         }
 
-    result = sentiment_pipeline(text)[0]
+    result = get_sentiment_pipeline()(text)[0]
 
     return {
         "sentiment": result["label"],
