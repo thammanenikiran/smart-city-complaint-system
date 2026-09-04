@@ -110,6 +110,37 @@ def classify_intent(text):
             "confidence": 0.0
         }
 
+    text_lower = text.lower().strip()
+
+    # Fast rules for common civic complaints
+    civic_keywords = [
+        "pothole",
+        "road",
+        "garbage",
+        "trash",
+        "waste",
+        "dustbin",
+        "water leak",
+        "water leakage",
+        "water supply",
+        "streetlight",
+        "street light",
+        "traffic signal",
+        "traffic light",
+        "traffic sign",
+        "fallen tree",
+        "tree blocking",
+        "crosswalk",
+        "pedestrian crossing"
+    ]
+
+    if any(keyword in text_lower for keyword in civic_keywords):
+        return {
+            "intent": "REPORT_ISSUE",
+            "confidence": 0.95
+        }
+
+    # Transformer fallback for less obvious complaints
     classifier = get_classifier()
 
     if classifier is None:
@@ -135,7 +166,6 @@ def classify_intent(text):
             4
         )
     }
-
 
 # ==========================================
 # CATEGORY CLASSIFICATION
@@ -428,45 +458,70 @@ def classify_category(text):
 # URGENCY CLASSIFICATION
 # ==========================================
 
-def classify_urgency(text):
+def classify_intent(text):
 
     if not text:
         return {
-            "urgency": "MEDIUM",
+            "intent": "REPORT_ISSUE",
             "confidence": 0.0
         }
+
+    text_lower = text.lower().strip()
+
+    # Fast rules for common civic complaints
+    civic_keywords = [
+        "pothole",
+        "road",
+        "garbage",
+        "trash",
+        "waste",
+        "dustbin",
+        "water leak",
+        "water leakage",
+        "water supply",
+        "streetlight",
+        "street light",
+        "traffic signal",
+        "traffic light",
+        "traffic sign",
+        "fallen tree",
+        "tree blocking",
+        "crosswalk",
+        "pedestrian crossing"
+    ]
+
+    if any(keyword in text_lower for keyword in civic_keywords):
+        return {
+            "intent": "REPORT_ISSUE",
+            "confidence": 0.95
+        }
+
+    # Transformer fallback for less obvious complaints
     classifier = get_classifier()
+
     if classifier is None:
         return {
-            "urgency": "MEDIUM",
+            "intent": "REPORT_ISSUE",
             "confidence": 0.0
         }
 
     result = classifier(
         text,
-        candidate_labels=URGENCY_LABELS
+        candidate_labels=INTENT_LABELS
     )
 
-    label = result["labels"][0]
-    confidence = result["scores"][0]
-
-    if label == URGENCY_LABELS[0]:
-        urgency = "HIGH"
-
-    elif label == URGENCY_LABELS[1]:
-        urgency = "MEDIUM"
-
-    else:
-        urgency = "LOW"
+    raw_label = result["labels"][0]
 
     return {
-        "urgency": urgency,
+        "intent": INTENT_MAP.get(
+            raw_label,
+            "REPORT_ISSUE"
+        ),
         "confidence": round(
-            confidence,
+            result["scores"][0],
             4
         )
     }
-
 
 # ==========================================
 # COMPLETE ANALYSIS
