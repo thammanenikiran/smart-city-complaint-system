@@ -396,7 +396,7 @@ def classify_category(text):
     # ==========================================
     # BART FALLBACK
     # ==========================================
-
+    classifier = get_classifier()
     if classifier is None:
         return {
             "category": "other",
@@ -435,7 +435,7 @@ def classify_urgency(text):
             "urgency": "MEDIUM",
             "confidence": 0.0
         }
-
+    classifier = get_classifier()
     if classifier is None:
         return {
             "urgency": "MEDIUM",
