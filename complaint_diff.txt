@@ -1,0 +1,338 @@
+diff --git a/routes/complaint_routes.py b/routes/complaint_routes.py
+index 84765db..b291933 100644
+--- a/routes/complaint_routes.py
++++ b/routes/complaint_routes.py
+@@ -203,36 +203,99 @@ def create_complaint():
+         # NLP ANALYSIS
+         # ==============================
+ 
++        nlp_result = {
++            "language": "unknown",
++            "keywords": []
++        }
++
++        classification = {
++            "intent": "REPORT_ISSUE",
++            "intent_confidence": 0,
++            "category": "other",
++            "category_confidence": 0,
++            "urgency": "MEDIUM",
++            "urgency_confidence": 0
++        }
++
++        entities = []
++        sentiment_result = {
++            "sentiment": "NEUTRAL",
++            "confidence": 0
++        }
++
++        summary = description[:100] if description else ""
++
++        # ==============================
++        # GENERAL NLP
++        # ==============================
++
+         try:
+             nlp_result = analyze_complaint(description)
++        except Exception as e:
++            print(f"[ERROR] General NLP Analysis failed: {e}")
++
++        # ==============================
++        # INTENT + CATEGORY
++        # IMPORTANT
++        # Keep this separate
++        # ==============================
++
++        try:
+             classification = analyze_intent_and_category(description)
++
++            print("\n========== AI CLASSIFICATION ==========")
++            print(f"Complaint: {description}")
++            print(f"Intent: {classification['intent']}")
++            print(f"Category: {classification['category']}")
++            print(f"Category Confidence: {classification['category_confidence']}")
++            print(f"Urgency: {classification['urgency']}")
++            print("=======================================\n")
++        except Exception as e:
++            print(f"[ERROR] Intent/Category Analysis failed: {e}")
++
++        # ==============================
++        # ENTITY EXTRACTION
++        # ==============================
++
++        try:
+             entities = extract_entities(description)
+-            sentiment_result = analyze_sentiment(description)
++        except Exception as e:
++            print(f"[ERROR] Entity extraction failed: {e}")
++            entities = []
+ 
+-            # Summarization
+-            summary = None
+-            if SUMMARIZER_AVAILABLE:
+-                try:
+-                    summary = summarize_complaint(description)
+-                except Exception:
+-                    summary = description[:100] + "..." if len(description) > 100 else description
+-            else:
+-                summary = description[:100] + "..." if len(description) > 100 else description
++        # ==============================
++        # SENTIMENT
++        # ==============================
+ 
++        try:
++            sentiment_result = analyze_sentiment(description)
+         except Exception as e:
+-            print(f"[ERROR] NLP Analysis failed: {e}")
+-            nlp_result = {"language": "unknown", "keywords": []}
+-            classification = {
+-                "intent": "REPORT_ISSUE",
+-                "intent_confidence": 0,
+-                "category": "other",
+-                "category_confidence": 0,
+-                "urgency": "MEDIUM",
+-                "urgency_confidence": 0
++            print(f"[ERROR] Sentiment analysis failed: {e}")
++            sentiment_result = {
++                "sentiment": "NEUTRAL",
++                "confidence": 0
+             }
+-            entities = []
+-            sentiment_result = {"sentiment": "NEUTRAL", "confidence": 0}
+-            summary = description[:100] if description else ""
++
++        # ==============================
++        # SUMMARIZATION
++        # ==============================
++
++        if SUMMARIZER_AVAILABLE:
++            try:
++                summary = summarize_complaint(description)
++            except Exception as e:
++                print(f"[ERROR] Summarization failed: {e}")
++                summary = (
++                    description[:100] + "..."
++                    if len(description) > 100
++                    else description
++                )
++        else:
++            summary = (
++                description[:100] + "..."
++                if len(description) > 100
++                else description
++            )
+ 
+         # ==============================
+         # IMAGE UPLOAD + VISION ANALYSIS
+@@ -272,7 +335,6 @@ def create_complaint():
+                     except Exception as e:
+                         print(f"[ERROR] Vision analysis failed: {e}")
+                         vision_result = None
+-
+             else:
+                 db.session.rollback()
+                 flash("Invalid image format. Use JPG, PNG, or WEBP.", "danger")
+@@ -299,7 +361,6 @@ def create_complaint():
+                     file_type="VIDEO"
+                 )
+                 db.session.add(media)
+-
+             else:
+                 db.session.rollback()
+                 flash("Invalid video format. Use MP4, AVI, MOV, or MKV.", "danger")
+@@ -457,7 +518,6 @@ def create_complaint():
+                     complaint.complaint_id,
+                     priority_result["priority"]
+                 )
+-
+         except Exception as e:
+             print(f"[WARNING] Notification error: {e}")
+ 
+@@ -608,6 +668,187 @@ def reject_resolution(complaint_id):
+     return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
+ 
+ 
++# ==============================
++# SUBMIT FEEDBACK
++# ==============================
++
++@complaint_bp.route("/<int:complaint_id>/feedback", methods=["POST"])
++def submit_feedback(complaint_id):
++
++    if "user_id" not in session:
++        return redirect(url_for("auth.login"))
++
++    complaint = Complaint.query.get_or_404(complaint_id)
++
++    if complaint.user_id != session["user_id"]:
++        return "Access Denied", 403
++
++    rating = request.form.get("rating", type=int)
++    comment = request.form.get("comment", "")
++
++    if not rating or rating < 1 or rating > 5:
++        flash("Please provide a valid rating (1-5).", "warning")
++        return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
++
++    # Check existing feedback
++    existing = Feedback.query.filter_by(
++        complaint_id=complaint_id,
++        user_id=session["user_id"]
++    ).first()
++
++    if existing:
++        existing.rating = rating
++        existing.comment = comment
++    else:
++        feedback = Feedback(
++            complaint_id=complaint_id,
++            user_id=session["user_id"],
++            rating=rating,
++            comment=comment
++        )
++        db.session.add(feedback)
++
++    db.session.commit()
++
++    flash("Thank you for your feedback!", "success")
++    return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
++
++
++# ==============================
++# MY COMPLAINTS
++# ==============================
++
++@complaint_bp.route("/my")
++def my_complaints():
++
++    if "user_id" not in session:
++        return redirect(url_for("auth.login"))
++
++    complaints = Complaint.query.filter_by(
++        user_id=session["user_id"]
++    ).order_by(
++        Complaint.created_at.desc()
++    ).all()
++
++    return render_template(
++        "complaints/my_complaints.html",
++        complaints=complaints,
++        get_status_badge=get_status_badge_class,
++        get_priority_badge=get_priority_badge_class
++    )
++
++
++# ==============================
++# COMPLAINT DETAIL
++# ==============================
++
++@complaint_bp.route("/<int:complaint_id>")
++def complaint_detail(complaint_id):
++
++    if "user_id" not in session:
++        return redirect(url_for("auth.login"))
++
++    complaint = Complaint.query.get_or_404(complaint_id)
++
++    # Citizens can only view their own complaints
++    if session.get("role") == "CITIZEN" and complaint.user_id != session["user_id"]:
++        return "Access Denied", 403
++
++    # Get AI result
++    ai_result = AIResult.query.filter_by(
++        complaint_id=complaint_id
++    ).first()
++
++    # Get history
++    history = ComplaintHistory.query.filter_by(
++        complaint_id=complaint_id
++    ).order_by(
++        ComplaintHistory.created_at.asc()
++    ).all()
++
++    # Get feedback
++    feedback = Feedback.query.filter_by(
++        complaint_id=complaint_id
++    ).first()
++
++    return render_template(
++        "complaints/detail.html",
++        complaint=complaint,
++        ai_result=ai_result,
++        history=history,
++        feedback=feedback,
++        get_status_badge=get_status_badge_class,
++        get_priority_badge=get_priority_badge_class
++    )
++
++
++# ==============================
++# CONFIRM RESOLUTION
++# ==============================
++
++@complaint_bp.route("/<int:complaint_id>/confirm", methods=["POST"])
++def confirm_resolution(complaint_id):
++
++    if "user_id" not in session:
++        return redirect(url_for("auth.login"))
++
++    complaint = Complaint.query.get_or_404(complaint_id)
++
++    if complaint.user_id != session["user_id"]:
++        return "Access Denied", 403
++
++    if complaint.status != "RESOLVED":
++        flash("This complaint is not in RESOLVED status.", "warning")
++        return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
++
++    old_status = complaint.status
++    complaint.status = "CLOSED"
++
++    add_history(
++        complaint_id, session["user_id"], "CITIZEN",
++        old_status, "CLOSED",
++        "Citizen confirmed resolution"
++    )
++
++    db.session.commit()
++
++    flash("Resolution confirmed. Complaint closed.", "success")
++    return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
++
++
++# ==============================
++# REJECT RESOLUTION
++# ==============================
++
++@complaint_bp.route("/<int:complaint_id>/reject", methods=["POST"])
++def reject_resolution(complaint_id):
++
++    if "user_id" not in session:
++        return redirect(url_for("auth.login"))
++
++    complaint = Complaint.query.get_or_404(complaint_id)
++
++    if complaint.user_id != session["user_id"]:
++        return "Access Denied", 403
++
++    reason = request.form.get("reason", "")
++
++    old_status = complaint.status
++    complaint.status = "REOPENED"
++
++    add_history(
++        complaint_id, session["user_id"], "CITIZEN",
++        old_status, "REOPENED",
++        "Citizen rejected resolution",
++        reason
++    )
++
++    db.session.commit()
++
++    flash("Complaint has been reopened for further action.", "info")
++    return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
++
++
+ # ==============================
+ # SUBMIT FEEDBACK
+ # ==============================

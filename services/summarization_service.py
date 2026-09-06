@@ -1,7 +1,8 @@
 """
 Summarization Service
 
-Uses FLAN-T5 to generate concise summaries of complaint descriptions.
+Uses FLAN-T5 to generate concise and relevant summaries
+of civic complaint descriptions.
 """
 
 from transformers import T5Tokenizer, T5ForConditionalGeneration
@@ -27,6 +28,8 @@ def get_summarizer():
 
             SUMMARIZER_LOADED = True
 
+            print("[INFO] Summarization model loaded successfully.")
+
         except Exception as e:
             print(f"[WARNING] Summarization model failed to load: {e}")
             SUMMARIZER_LOADED = False
@@ -36,46 +39,96 @@ def get_summarizer():
 
 def summarize_complaint(text):
     """
-    Generate a concise summary of a complaint description.
+    Generate a concise, relevant summary of a civic complaint.
+
+    The summary should:
+    - describe the main civic problem
+    - mention important secondary problems
+    - mention the major impact/risk
+    - remain concise
     """
 
-    if not text or len(text.strip()) < 20:
-        return text.strip() if text else ""
+    if not text:
+        return ""
+
+    text = text.strip()
+
+    if len(text) < 40:
+        return text
 
     tokenizer, model = get_summarizer()
 
+    # Fallback if model cannot be loaded
     if model is None or tokenizer is None:
-        return text[:100].strip() + "..." if len(text) > 100 else text
+        return _fallback_summary(text)
 
     try:
+        # FLAN-T5 works better when given a clear task instruction.
         input_text = (
-            f"Summarize this civic complaint in one sentence: {text}"
+            "Summarize the following civic complaint in one clear sentence. "
+            "Keep the main problem, important secondary issue, and major impact. "
+            "Do not add information that is not present in the complaint. "
+            "Civic complaint: "
+            + text
         )
 
-        if len(input_text) > 512:
-            input_text = input_text[:512]
-
-        input_ids = tokenizer(
+        # Tokenize using tokens rather than Python characters.
+        inputs = tokenizer(
             input_text,
             return_tensors="pt",
             max_length=512,
             truncation=True
-        ).input_ids
+        )
 
         outputs = model.generate(
-            input_ids,
-            max_new_tokens=60,
-            num_beams=2,
+            inputs.input_ids,
+            attention_mask=inputs.attention_mask,
+            max_new_tokens=50,
+            min_new_tokens=15,
+            num_beams=4,
+            no_repeat_ngram_size=3,
+            length_penalty=1.0,
             early_stopping=True
         )
 
         summary = tokenizer.decode(
             outputs[0],
             skip_special_tokens=True
-        )
+        ).strip()
 
-        return summary.strip() if summary else text[:100]
+        # Validate generated output
+        if not summary:
+            return _fallback_summary(text)
+
+        # Sometimes instruction-following models return the prompt
+        # or an extremely short response.
+        if len(summary) < 20:
+            return _fallback_summary(text)
+
+        return summary
 
     except Exception as e:
         print(f"[WARNING] Summarization failed: {e}")
-        return text[:100].strip() + "..." if len(text) > 100 else text
+        return _fallback_summary(text)
+
+
+def _fallback_summary(text):
+    """
+    Safe fallback when the AI summarizer is unavailable.
+
+    Uses the first complete sentence instead of blindly
+    cutting the complaint at 100 characters.
+    """
+
+    sentences = text.replace("\n", " ").split(".")
+
+    for sentence in sentences:
+        sentence = sentence.strip()
+
+        if len(sentence) >= 30:
+            return sentence + "."
+
+    if len(text) > 150:
+        return text[:150].rsplit(" ", 1)[0] + "..."
+
+    return text

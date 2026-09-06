@@ -10,3 +10,4 @@ from models.notification import Notification
 from models.complaint_history import ComplaintHistory
 from models.complaint_action import ComplaintAction
 from models.escalation import Escalation
+from models.complaint_department import ComplaintDepartment

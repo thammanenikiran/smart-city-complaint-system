@@ -8,13 +8,7 @@ Centralized department assignment logic.
 from models.department import Department
 
 
-# ==============================
-# CATEGORY TO DEPARTMENT MAPPING
-# ==============================
-
 CATEGORY_TO_DEPARTMENT = {
-
-    # NLP category labels
     "pothole": "Roads Department",
     "damaged_road": "Roads Department",
     "damaged_crosswalk": "Roads Department",
@@ -23,6 +17,7 @@ CATEGORY_TO_DEPARTMENT = {
     "overflowing_bin": "Sanitation Department",
 
     "water_leakage": "Water Supply Department",
+    "drainage_problem": "Water Supply Department",
 
     "broken_streetlight": "Electrical Department",
 
@@ -30,7 +25,6 @@ CATEGORY_TO_DEPARTMENT = {
 
     "fallen_tree": "Parks and Gardens Department",
 
-    # Legacy NLP labels (backward compatibility)
     "road damage": "Roads Department",
     "waste management": "Sanitation Department",
     "water supply": "Water Supply Department",
@@ -163,3 +157,36 @@ def get_department_name_for_category(category):
 
     normalized = normalize_category(category)
     return CATEGORY_TO_DEPARTMENT.get(normalized, "Manual Review")
+def assign_multiple_departments(detected_issues):
+    """
+    Convert multiple detected civic issues into
+    unique departments.
+
+    The first detected department becomes
+    the lead department.
+    """
+
+    departments = []
+
+    for issue in detected_issues:
+
+        category = issue.get("category")
+
+        department_name = CATEGORY_TO_DEPARTMENT.get(category)
+
+        if not department_name:
+            continue
+
+        if department_name not in departments:
+            departments.append(department_name)
+
+    if not departments:
+        return {
+            "lead_department": None,
+            "supporting_departments": []
+        }
+
+    return {
+        "lead_department": departments[0],
+        "supporting_departments": departments[1:]
+    }

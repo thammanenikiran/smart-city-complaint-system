@@ -83,35 +83,53 @@ def fuse_results(
                 )
             }
 
+        # ==============================
+        # DISAGREEMENT
+        # ==============================
+
+        # If Vision says "other" but NLP
+        # identified a specific category,
+        # trust the specific NLP category.
+        if vision_norm == "other" and has_nlp:
+            chosen_category = nlp_category
+            chosen_confidence = nlp_confidence
+            chosen_source = "NLP"
+
+        # If NLP says "other" but Vision
+        # identified a specific category,
+        # trust Vision.
+        elif nlp_norm == "other" and has_vision:
+            chosen_category = vision_issue
+            chosen_confidence = vision_confidence
+            chosen_source = "VISION"
+
+        # Otherwise use the higher confidence result.
+        elif vision_confidence >= nlp_confidence:
+            chosen_category = vision_issue
+            chosen_confidence = vision_confidence
+            chosen_source = "VISION"
+
         else:
+            chosen_category = nlp_category
+            chosen_confidence = nlp_confidence
+            chosen_source = "NLP"
 
-            # Disagreement — use higher confidence result
-            if vision_confidence >= nlp_confidence:
-                chosen_category = vision_issue
-                chosen_confidence = vision_confidence
-                chosen_source = "VISION"
-            else:
-                chosen_category = nlp_category
-                chosen_confidence = nlp_confidence
-                chosen_source = "NLP"
+        needs_review = chosen_confidence < AUTO_CLASSIFY_THRESHOLD
 
-            # Flag for review if confidence is below threshold
-            needs_review = chosen_confidence < AUTO_CLASSIFY_THRESHOLD
-
-            return {
-                "final_category": chosen_category,
-                "final_severity": vision_severity or nlp_urgency,
-                "confidence": round(chosen_confidence, 4),
-                "source": chosen_source,
-                "agreement": False,
-                "review_flag": needs_review,
-                "reason": (
-                    f"NLP says '{nlp_category}' ({nlp_confidence:.2f}), "
-                    f"Vision says '{vision_issue}' ({vision_confidence:.2f}). "
-                    f"Using {chosen_source} result."
-                    + (" Flagged for review." if needs_review else "")
-                )
-            }
+        return {
+            "final_category": chosen_category,
+            "final_severity": vision_severity or nlp_urgency,
+            "confidence": round(chosen_confidence, 4),
+            "source": chosen_source,
+            "agreement": False,
+            "review_flag": needs_review,
+            "reason": (
+                f"NLP says '{nlp_category}' ({nlp_confidence:.2f}), "
+                f"Vision says '{vision_issue}' ({vision_confidence:.2f}). "
+                f"Using {chosen_source} result."
+                + (" Flagged for review." if needs_review else "")
+            )
+        }
 
     # ==============================
     # CASE 2: Only NLP available

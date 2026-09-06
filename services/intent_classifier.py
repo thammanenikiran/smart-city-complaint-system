@@ -102,71 +102,6 @@ def get_classifier():
 # INTENT CLASSIFICATION
 # ==========================================
 
-def classify_intent(text):
-
-    if not text:
-        return {
-            "intent": "REPORT_ISSUE",
-            "confidence": 0.0
-        }
-
-    text_lower = text.lower().strip()
-
-    # Fast rules for common civic complaints
-    civic_keywords = [
-        "pothole",
-        "road",
-        "garbage",
-        "trash",
-        "waste",
-        "dustbin",
-        "water leak",
-        "water leakage",
-        "water supply",
-        "streetlight",
-        "street light",
-        "traffic signal",
-        "traffic light",
-        "traffic sign",
-        "fallen tree",
-        "tree blocking",
-        "crosswalk",
-        "pedestrian crossing"
-    ]
-
-    if any(keyword in text_lower for keyword in civic_keywords):
-        return {
-            "intent": "REPORT_ISSUE",
-            "confidence": 0.95
-        }
-
-    # Transformer fallback for less obvious complaints
-    classifier = get_classifier()
-
-    if classifier is None:
-        return {
-            "intent": "REPORT_ISSUE",
-            "confidence": 0.0
-        }
-
-    result = classifier(
-        text,
-        candidate_labels=INTENT_LABELS
-    )
-
-    raw_label = result["labels"][0]
-
-    return {
-        "intent": INTENT_MAP.get(
-            raw_label,
-            "REPORT_ISSUE"
-        ),
-        "confidence": round(
-            result["scores"][0],
-            4
-        )
-    }
-
 # ==========================================
 # CATEGORY CLASSIFICATION
 # ==========================================
@@ -455,7 +390,7 @@ def classify_category(text):
 
 
 # ==========================================
-# URGENCY CLASSIFICATION
+# INTENT CLASSIFICATION
 # ==========================================
 
 def classify_intent(text):
@@ -468,33 +403,41 @@ def classify_intent(text):
 
     text_lower = text.lower().strip()
 
-    # Fast rules for common civic complaints
-    civic_keywords = [
-        "pothole",
-        "road",
-        "garbage",
-        "trash",
-        "waste",
-        "dustbin",
-        "water leak",
-        "water leakage",
-        "water supply",
-        "streetlight",
-        "street light",
-        "traffic signal",
-        "traffic light",
-        "traffic sign",
-        "fallen tree",
-        "tree blocking",
-        "crosswalk",
-        "pedestrian crossing"
+    intent_rules = [
+        ("REPORT_HAZARD", [
+            "danger", "dangerous", "hazard", "unsafe", "risk",
+            "accident", "blocking the road", "blocking traffic"
+        ]),
+        ("REPORT_OVERFLOW", [
+            "overflow", "overflowing", "leak", "leakage", "flood",
+            "spillage", "spilled"
+        ]),
+        ("REQUEST_REPAIR", [
+            "repair", "fix", "broken", "not working", "maintenance",
+            "replace", "restore", "needs attention"
+        ]),
+        ("REPORT_DAMAGE", [
+            "damage", "damaged", "destroyed", "cracked", "missing",
+            "collapsed"
+        ]),
+        ("GENERAL_QUERY", [
+            "how do i", "how can i", "where can i", "what is",
+            "information about", "check status", "track my complaint",
+            "hello", "help"
+        ]),
+        ("REPORT_ISSUE", [
+            "pothole", "road", "garbage", "trash", "waste", "dustbin",
+            "water supply", "streetlight", "street light", "traffic",
+            "fallen tree", "tree blocking", "crosswalk", "pedestrian crossing"
+        ])
     ]
 
-    if any(keyword in text_lower for keyword in civic_keywords):
-        return {
-            "intent": "REPORT_ISSUE",
-            "confidence": 0.95
-        }
+    for intent, keywords in intent_rules:
+        if any(keyword in text_lower for keyword in keywords):
+            return {
+                "intent": intent,
+                "confidence": 0.95
+            }
 
     # Transformer fallback for less obvious complaints
     classifier = get_classifier()
@@ -522,6 +465,44 @@ def classify_intent(text):
             4
         )
     }
+
+
+def classify_urgency(text):
+    if not text:
+        return {
+            "urgency": "MEDIUM",
+            "confidence": 0.0
+        }
+
+    text_lower = text.lower().strip()
+
+    if any(keyword in text_lower for keyword in [
+        "emergency", "immediate", "dangerous", "danger", "injury",
+        "fire", "flood", "blocking traffic"
+    ]):
+        return {"urgency": "HIGH", "confidence": 0.95}
+
+    if any(keyword in text_lower for keyword in [
+        "urgent", "soon", "not working", "overflowing", "leak",
+        "broken", "hazard", "risk"
+    ]):
+        return {"urgency": "MEDIUM", "confidence": 0.9}
+
+    classifier = get_classifier()
+    if classifier is None:
+        return {"urgency": "LOW", "confidence": 0.5}
+
+    result = classifier(text, candidate_labels=URGENCY_LABELS)
+    raw_label = result["labels"][0]
+    urgency = "HIGH" if raw_label == URGENCY_LABELS[0] else (
+        "LOW" if raw_label == URGENCY_LABELS[2] else "MEDIUM"
+    )
+
+    return {
+        "urgency": urgency,
+        "confidence": round(result["scores"][0], 4)
+    }
+
 
 # ==========================================
 # COMPLETE ANALYSIS

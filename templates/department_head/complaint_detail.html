@@ -6,6 +6,7 @@
 
 <div class="container mt-4">
 
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2>
@@ -19,12 +20,13 @@
 
         <a href="{{ url_for('department_head.all_complaints') }}"
            class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back
+            <i class="bi bi-arrow-left"></i>
+            Back
         </a>
     </div>
 
 
-    <!-- Complaint Information -->
+    <!-- Complaint Details -->
     <div class="card shadow-sm mb-4">
 
         <div class="card-header bg-primary text-white">
@@ -34,7 +36,9 @@
 
         <div class="card-body">
 
-            <h4>{{ complaint.title or 'Untitled Complaint' }}</h4>
+            <h4>
+                {{ complaint.title or 'Untitled Complaint' }}
+            </h4>
 
             <p class="mt-3">
                 {{ complaint.description }}
@@ -46,7 +50,9 @@
 
                 <div class="col-md-4">
                     <strong>Category</strong>
-                    <p>{{ complaint.category or '-' }}</p>
+                    <p>
+                        {{ complaint.category or '-' }}
+                    </p>
                 </div>
 
                 <div class="col-md-4">
@@ -73,7 +79,9 @@
 
                 <div class="col-md-6">
                     <strong>Location</strong>
-                    <p>{{ complaint.location or '-' }}</p>
+                    <p>
+                        {{ complaint.location or '-' }}
+                    </p>
                 </div>
 
                 <div class="col-md-6">
@@ -87,7 +95,6 @@
             </div>
 
         </div>
-
     </div>
 
 
@@ -107,112 +114,289 @@
 
                 <div class="col-md-4">
                     <strong>AI Category</strong>
-                    <p>{{ ai_result.category or '-' }}</p>
+                    <p>
+                        {{ ai_result.category or '-' }}
+                    </p>
                 </div>
 
                 <div class="col-md-4">
                     <strong>AI Priority</strong>
-                    <p>{{ ai_result.priority or '-' }}</p>
+                    <p>
+                        {{ ai_result.priority or '-' }}
+                    </p>
                 </div>
 
                 <div class="col-md-4">
                     <strong>Confidence</strong>
-                    <p>{{ ai_result.confidence or '-' }}</p>
+                    <p>
+                        {{ ai_result.confidence or '-' }}
+                    </p>
                 </div>
 
             </div>
 
         </div>
-
     </div>
 
     {% endif %}
 
 
-    <!-- Assignment -->
+    <!-- Department Task -->
     <div class="card shadow-sm mb-4">
 
         <div class="card-header bg-success text-white">
-            <i class="bi bi-person-check"></i>
-            Assign Complaint to Officer
+            <i class="bi bi-diagram-3"></i>
+            Your Department Task
         </div>
 
         <div class="card-body">
 
-            {% if officers_workload %}
+            {% if department_task %}
 
-            <form method="POST"
-                  action="{{ url_for(
-                      'department_head.assign_officer',
-                      complaint_id=complaint.complaint_id
-                  ) }}">
+                <!-- Task Information -->
+                <div class="alert alert-info">
 
-                <div class="mb-3">
+                    <h5 class="mb-2">
 
-                    <label class="form-label fw-bold">
-                        Select Officer
-                    </label>
+                        {{ department_task.department.department_name }}
 
-                    <select name="officer_id"
-                            class="form-select"
-                            required>
+                        {% if department_task.role == "LEAD" %}
 
-                        <option value="">
-                            -- Select Normal Officer --
-                        </option>
+                            <span class="badge bg-primary ms-2">
+                                Lead Department
+                            </span>
 
-                        {% for item in officers_workload %}
+                        {% else %}
 
-                        <option value="{{ item.officer_id }}">
+                            <span class="badge bg-secondary ms-2">
+                                Supporting Department
+                            </span>
 
-                            {{ item.name }}
-                            —
-                            Active Workload: {{ item.active_workload }}
-                            —
-                            Resolved: {{ item.resolved }}
+                        {% endif %}
 
-                        </option>
+                    </h5>
 
-                        {% endfor %}
+                    <p class="mb-2">
+                        <strong>Task:</strong>
+                        {{ department_task.task_description }}
+                    </p>
 
-                    </select>
+                    <p class="mb-0">
+                        <strong>Task Status:</strong>
 
-                </div>
-
-
-                <div class="mb-3">
-
-                    <label class="form-label fw-bold">
-                        Assignment Reason
-                    </label>
-
-                    <textarea name="reason"
-                              class="form-control"
-                              rows="3"
-                              placeholder="Why is this complaint being assigned to this officer?"></textarea>
+                        <span class="badge bg-info">
+                            {{ department_task.status }}
+                        </span>
+                    </p>
 
                 </div>
 
 
-                <button type="submit"
-                        class="btn btn-success">
+                <!-- Current Officer -->
+                <div class="card border mb-4">
 
-                    <i class="bi bi-person-check-fill"></i>
-                    Assign Complaint
+                    <div class="card-body">
 
-                </button>
+                        <h6 class="fw-bold">
+                            <i class="bi bi-person-badge"></i>
+                            Current Officer
+                        </h6>
 
-            </form>
+                        {% if department_task.assigned_officer_id %}
+
+                            {% set current_officer = namespace(name='Unknown Officer') %}
+
+                            {% for item in officers_workload %}
+
+                                {% if item.officer_id == department_task.assigned_officer_id %}
+
+                                    {% set current_officer.name = item.name %}
+
+                                {% endif %}
+
+                            {% endfor %}
+
+                            <p class="mb-0">
+
+                                <span class="badge bg-success">
+                                    Currently Assigned
+                                </span>
+
+                                <strong class="ms-2">
+                                    {{ current_officer.name }}
+                                </strong>
+
+                            </p>
+
+                        {% else %}
+
+                            <p class="text-muted mb-0">
+                                No officer is currently assigned.
+                            </p>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+
+                <!-- Officer Assignment / Reassignment -->
+                {% if officers_workload %}
+
+                <h5 class="mb-3">
+
+                    <i class="bi bi-person-check"></i>
+
+                    {% if department_task.assigned_officer_id %}
+                        Reassign Department Task
+                    {% else %}
+                        Assign Department Task
+                    {% endif %}
+
+                </h5>
+
+
+                <form method="POST"
+                      action="{{ url_for(
+                          'department_head.assign_officer',
+                          complaint_id=complaint.complaint_id
+                      ) }}">
+
+                    <!-- Officer -->
+                    <div class="mb-3">
+
+                        <label class="form-label fw-bold">
+                            Select Normal Officer
+                        </label>
+
+                        <select name="officer_id"
+                                class="form-select"
+                                required>
+
+                            <option value="">
+                                -- Select Normal Officer --
+                            </option>
+
+                            {% for item in officers_workload %}
+
+                            <option value="{{ item.officer_id }}"
+                                {% if department_task.assigned_officer_id == item.officer_id %}
+                                    selected
+                                {% endif %}>
+
+                                {{ item.name }}
+                                —
+                                Active Workload: {{ item.active_workload }}
+                                —
+                                Resolved: {{ item.resolved }}
+
+                            </option>
+
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Assignment / Reassignment Reason -->
+                    <div class="mb-3">
+
+                        <label class="form-label fw-bold">
+                            Reason for Assignment / Reassignment
+                        </label>
+
+                        <select name="reason"
+                                class="form-select">
+
+                            <option value="">
+                                -- Select Reason --
+                            </option>
+
+                            <option value="New task assignment">
+                                New task assignment
+                            </option>
+
+                            <option value="Officer unavailable">
+                                Officer unavailable
+                            </option>
+
+                            <option value="Officer not responding">
+                                Officer not responding
+                            </option>
+
+                            <option value="Officer left the department">
+                                Officer left the department
+                            </option>
+
+                            <option value="Workload too high">
+                                Workload too high
+                            </option>
+
+                            <option value="Other">
+                                Other
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <!-- Optional Remarks -->
+                    <div class="mb-3">
+
+                        <label class="form-label fw-bold">
+                            Additional Remarks
+                        </label>
+
+                        <textarea name="remarks"
+                                  class="form-control"
+                                  rows="3"
+                                  placeholder="Enter any additional information..."></textarea>
+
+                    </div>
+
+
+                    <!-- Button -->
+                    <button type="submit"
+                            class="btn btn-success">
+
+                        <i class="bi bi-person-check-fill"></i>
+
+                        {% if department_task.assigned_officer_id %}
+                            Reassign Task
+                        {% else %}
+                            Assign Task
+                        {% endif %}
+
+                    </button>
+
+                </form>
+
+
+                {% else %}
+
+                <div class="alert alert-warning mb-0">
+
+                    <i class="bi bi-exclamation-triangle"></i>
+
+                    No normal officers are available in your department.
+
+                </div>
+
+                {% endif %}
+
 
             {% else %}
 
-            <div class="alert alert-warning mb-0">
+                <div class="alert alert-danger mb-0">
 
-                <i class="bi bi-exclamation-triangle"></i>
+                    <i class="bi bi-exclamation-triangle"></i>
 
-                No normal officers are available in this department.
+                    This complaint has no task assigned to your department.
 
-            </div>
+                </div>
 
             {% endif %}
 
@@ -221,44 +405,15 @@
     </div>
 
 
-    <!-- Current Assignment -->
+    <!-- Complaint History -->
     <div class="card shadow-sm mb-4">
 
         <div class="card-header">
-            <i class="bi bi-person-badge"></i>
-            Current Assignment
-        </div>
 
-        <div class="card-body">
-
-            {% if complaint.assigned_officer_id %}
-
-                <p class="mb-0">
-                    Assigned Officer ID:
-                    <strong>
-                        #{{ complaint.assigned_officer_id }}
-                    </strong>
-                </p>
-
-            {% else %}
-
-                <p class="text-muted mb-0">
-                    This complaint is currently not assigned to an officer.
-                </p>
-
-            {% endif %}
-
-        </div>
-
-    </div>
-
-
-    <!-- History -->
-    <div class="card shadow-sm mb-4">
-
-        <div class="card-header">
             <i class="bi bi-clock-history"></i>
+
             Complaint History
+
         </div>
 
         <div class="card-body">
@@ -271,17 +426,23 @@
 
                 <div class="list-group-item">
 
-                    <strong>{{ h.action }}</strong>
+                    <strong>
+                        {{ h.action }}
+                    </strong>
 
                     {% if h.remarks %}
+
                     <p class="mb-1 text-muted">
                         {{ h.remarks }}
                     </p>
+
                     {% endif %}
 
                     <small class="text-muted">
+
                         {{ h.created_at.strftime('%d %b %Y %I:%M %p')
                            if h.created_at else '' }}
+
                     </small>
 
                 </div>

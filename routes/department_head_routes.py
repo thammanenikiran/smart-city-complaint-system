@@ -28,6 +28,8 @@ from models.ai_result import AIResult
 from models.complaint_history import ComplaintHistory
 from models.feedback import Feedback
 from werkzeug.security import generate_password_hash
+from sqlalchemy import or_
+from models.complaint_department import ComplaintDepartment
 
 from services.assignment_service import (
     get_department_officers_workload,
@@ -265,7 +267,16 @@ def all_complaints():
     officer_filter = request.args.get("officer_id")
     review_flag = request.args.get("review_flag")
 
-    query = Complaint.query.filter_by(department_id=head.department_id)
+    query = Complaint.query.filter(
+    or_(
+        Complaint.department_id == head.department_id,
+        Complaint.complaint_id.in_(
+            db.session.query(ComplaintDepartment.complaint_id).filter(
+                ComplaintDepartment.department_id == head.department_id
+            )
+        )
+    )
+)
 
     if status_filter:
         query = query.filter(Complaint.status == status_filter)
@@ -311,9 +322,22 @@ def complaint_detail(complaint_id):
 
     complaint = Complaint.query.get_or_404(complaint_id)
 
-    # Security check: must belong to this department
-    if complaint.department_id != head.department_id:
-        flash("You can only access complaints belonging to your department.", "danger")
+    # Security check:
+    # Allow both Lead and Supporting Departments
+    is_lead_department = (
+        complaint.department_id == head.department_id
+    )
+
+    is_supporting_department = ComplaintDepartment.query.filter_by(
+        complaint_id=complaint_id,
+        department_id=head.department_id
+    ).first() is not None
+
+    if not is_lead_department and not is_supporting_department:
+        flash(
+            "You can only access complaints assigned to your department.",
+            "danger"
+        )
         return redirect(url_for("department_head.dashboard"))
 
     ai_result = AIResult.query.filter_by(complaint_id=complaint_id).first()
@@ -326,6 +350,11 @@ def complaint_detail(complaint_id):
 
     officers_workload = get_department_officers_workload(head.department_id)
     all_departments = Department.query.order_by(Department.department_name.asc()).all()
+    # Get this department's specific task for this complaint
+    department_task = ComplaintDepartment.query.filter_by(
+        complaint_id=complaint_id,
+        department_id=head.department_id
+    ).first()
 
     return render_template(
         "department_head/complaint_detail.html",
@@ -336,43 +365,199 @@ def complaint_detail(complaint_id):
         officers_workload=officers_workload,
         departments=all_departments,
         get_status_badge=get_status_badge_class,
-        get_priority_badge=get_priority_badge_class
+        get_priority_badge=get_priority_badge_class,
+        department_task=department_task,
     )
 
-
-# ==============================
-# ASSIGN OFFICER ACTION
-# ==============================
 
 @department_head_bp.route("/complaint/<int:complaint_id>/assign", methods=["POST"])
 def assign_officer(complaint_id):
+
     head, error_response = get_authenticated_dept_head()
+
     if error_response:
         return error_response
 
+    complaint = Complaint.query.get_or_404(complaint_id)
+
+    complaint_department = ComplaintDepartment.query.filter_by(
+        complaint_id=complaint_id,
+        department_id=head.department_id
+    ).first()
+
+    if not complaint_department:
+        flash(
+            "This complaint is not assigned to your department.",
+            "danger"
+        )
+        return redirect(
+            url_for(
+                "department_head.complaint_detail",
+                complaint_id=complaint_id
+            )
+        )
+
     officer_id_raw = request.form.get("officer_id")
     reason = request.form.get("reason", "").strip()
+    remarks = request.form.get("remarks", "").strip()
+
+    if remarks:
+        reason = f"{reason} — {remarks}" if reason else remarks
 
     if not officer_id_raw or not officer_id_raw.isdigit():
-        flash("Please select an officer from your department.", "danger")
-        return redirect(url_for("department_head.complaint_detail", complaint_id=complaint_id))
+        flash(
+            "Please select an officer from your department.",
+            "danger"
+        )
+        return redirect(
+            url_for(
+                "department_head.complaint_detail",
+                complaint_id=complaint_id
+            )
+        )
 
     officer_id = int(officer_id_raw)
-    success, msg = assign_complaint_to_officer(
+
+    # Make sure officer belongs to this department
+    officer = User.query.filter_by(
+        user_id=officer_id,
+        department_id=head.department_id,
+        role="OFFICER",
+        is_department_head=False
+    ).first()
+
+    if not officer:
+        flash(
+            "Invalid officer selected. Officer must belong to your department.",
+            "danger"
+        )
+        return redirect(
+            url_for(
+                "department_head.complaint_detail",
+                complaint_id=complaint_id
+            )
+        )
+
+    # Prevent duplicate assignment to the same officer
+    if complaint_department.assigned_officer_id == officer_id:
+        flash(
+            f"{officer.name} is already assigned to this department task.",
+            "warning"
+        )
+        return redirect(
+            url_for(
+                "department_head.complaint_detail",
+                complaint_id=complaint_id
+            )
+        )
+
+    # Store previous officer before changing
+    previous_officer_id = complaint_department.assigned_officer_id
+
+    # Assign officer to this department task
+    complaint_department.assigned_officer_id = officer_id
+    complaint_department.status = "ASSIGNED"
+
+    # Only the Lead Department updates the main complaint assignment
+    if complaint_department.role == "LEAD":
+        complaint.assigned_officer_id = officer_id
+
+    # Create assignment/reassignment history
+    if previous_officer_id:
+        previous_officer = User.query.get(previous_officer_id)
+
+        action = (
+            f"{complaint_department.department.department_name} "
+            f"task reassigned from "
+            f"{previous_officer.name if previous_officer else 'previous officer'} "
+            f"to {officer.name}"
+        )
+
+        history_status = "REASSIGNED"
+
+    else:
+        action = (
+            f"{complaint_department.department.department_name} "
+            f"task assigned to {officer.name}"
+        )
+
+        history_status = "ASSIGNED"
+
+    history = ComplaintHistory(
         complaint_id=complaint_id,
-        officer_id=officer_id,
-        assigned_by_user_id=head.user_id,
-        reason=reason
+        changed_by=head.user_id,
+        user_role="DEPARTMENT_HEAD",
+        old_status=complaint.status,
+        new_status=history_status,
+        action=action,
+        remarks=reason or "Department-specific officer assignment"
     )
 
-    if success:
-        flash(msg, "success")
+    db.session.add(history)
+    db.session.commit()
+
+    flash(
+        f"Task assigned to {officer.name} successfully.",
+        "success"
+    )
+
+    return redirect(
+        url_for(
+            "department_head.complaint_detail",
+            complaint_id=complaint_id
+        )
+    )
+    # Store previous officer before changing
+    previous_officer_id = complaint_department.assigned_officer_id
+
+    # Assign officer ONLY to this department's task
+    complaint_department.assigned_officer_id = officer_id
+    complaint_department.status = "ASSIGNED"
+
+    # Keep global complaint assignment only for the Lead Department
+    if complaint_department.role == "LEAD":
+        complaint.assigned_officer_id = officer_id
+
+    # Record assignment / reassignment
+    if previous_officer_id:
+        previous_officer = User.query.get(previous_officer_id)
+
+        action = (
+            f"{complaint_department.department.department_name} "
+            f"task reassigned from "
+            f"{previous_officer.name if previous_officer else 'previous officer'} "
+            f"to {officer.name}"
+        )
     else:
-        flash(msg, "danger")
+        action = (
+            f"{complaint_department.department.department_name} "
+            f"task assigned to {officer.name}"
+        )
 
-    return redirect(url_for("department_head.complaint_detail", complaint_id=complaint_id))
+    history = ComplaintHistory(
+        complaint_id=complaint_id,
+        changed_by=head.user_id,
+        user_role="DEPARTMENT_HEAD",
+        old_status=complaint.status,
+        new_status=complaint.status,
+        action=action,
+        remarks=reason or "Department-specific officer assignment"
+    )
 
+    db.session.add(history)
+    db.session.commit()
 
+    flash(
+        f"Task assigned to {officer.name} successfully.",
+        "success"
+    )
+
+    return redirect(
+        url_for(
+            "department_head.complaint_detail",
+            complaint_id=complaint_id
+        )
+    )
 # ==============================
 # CORRECT AI CLASSIFICATION
 # ==============================
@@ -418,8 +603,11 @@ def correct_ai(complaint_id):
             user_role="DEPARTMENT_HEAD",
             old_status=complaint.status,
             new_status=complaint.status,
-            action=f"Transferred department from {old_dept_name} to {target_dept.department_name}",
-            remarks=remarks or "Department correction by Department Head"
+            action=(
+                f"Complaint transferred from {old_dept_name} "
+                f"to {target_dept.department_name}"
+            ),
+            remarks=remarks or "Department reassignment by department head"
         )
         db.session.add(history)
         db.session.commit()

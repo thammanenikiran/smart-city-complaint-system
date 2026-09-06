@@ -27,15 +27,19 @@ from models.media import ComplaintMedia
 from models.ai_result import AIResult
 from models.complaint_history import ComplaintHistory
 from models.feedback import Feedback
+from models.department import Department
+
 
 from services.nlp_service import analyze_complaint
 from services.intent_classifier import analyze_intent_and_category
 from services.ner_service import extract_entities
 from services.sentiment_service import analyze_sentiment
 from services.duplicate_service import check_for_duplicates
-from services.department_router import assign_department
+from services.department_router import assign_department, assign_multiple_departments
 from services.priority_service import calculate_priority
 from services.fusion_service import fuse_results
+from models.complaint_department import ComplaintDepartment
+from services.multi_issue_service import detect_multiple_issues
 
 # Import with graceful fallback
 try:
@@ -203,36 +207,99 @@ def create_complaint():
         # NLP ANALYSIS
         # ==============================
 
+        nlp_result = {
+            "language": "unknown",
+            "keywords": []
+        }
+
+        classification = {
+            "intent": "REPORT_ISSUE",
+            "intent_confidence": 0,
+            "category": "other",
+            "category_confidence": 0,
+            "urgency": "MEDIUM",
+            "urgency_confidence": 0
+        }
+
+        entities = []
+        sentiment_result = {
+            "sentiment": "NEUTRAL",
+            "confidence": 0
+        }
+
+        summary = description[:100] if description else ""
+
+        # ==============================
+        # GENERAL NLP
+        # ==============================
+
         try:
             nlp_result = analyze_complaint(description)
-            classification = analyze_intent_and_category(description)
-            entities = extract_entities(description)
-            sentiment_result = analyze_sentiment(description)
-
-            # Summarization
-            summary = None
-            if SUMMARIZER_AVAILABLE:
-                try:
-                    summary = summarize_complaint(description)
-                except Exception:
-                    summary = description[:100] + "..." if len(description) > 100 else description
-            else:
-                summary = description[:100] + "..." if len(description) > 100 else description
-
         except Exception as e:
-            print(f"[ERROR] NLP Analysis failed: {e}")
-            nlp_result = {"language": "unknown", "keywords": []}
-            classification = {
-                "intent": "REPORT_ISSUE",
-                "intent_confidence": 0,
-                "category": "other",
-                "category_confidence": 0,
-                "urgency": "MEDIUM",
-                "urgency_confidence": 0
-            }
+            print(f"[ERROR] General NLP Analysis failed: {e}")
+
+        # ==============================
+        # INTENT + CATEGORY
+        # IMPORTANT
+        # Keep this separate
+        # ==============================
+
+        try:
+            classification = analyze_intent_and_category(description)
+
+            print("\n========== AI CLASSIFICATION ==========")
+            print(f"Complaint: {description}")
+            print(f"Intent: {classification['intent']}")
+            print(f"Category: {classification['category']}")
+            print(f"Category Confidence: {classification['category_confidence']}")
+            print(f"Urgency: {classification['urgency']}")
+            print("=======================================\n")
+        except Exception as e:
+            print(f"[ERROR] Intent/Category Analysis failed: {e}")
+
+        # ==============================
+        # ENTITY EXTRACTION
+        # ==============================
+
+        try:
+            entities = extract_entities(description)
+        except Exception as e:
+            print(f"[ERROR] Entity extraction failed: {e}")
             entities = []
-            sentiment_result = {"sentiment": "NEUTRAL", "confidence": 0}
-            summary = description[:100] if description else ""
+
+        # ==============================
+        # SENTIMENT
+        # ==============================
+
+        try:
+            sentiment_result = analyze_sentiment(description)
+        except Exception as e:
+            print(f"[ERROR] Sentiment analysis failed: {e}")
+            sentiment_result = {
+                "sentiment": "NEUTRAL",
+                "confidence": 0
+            }
+
+        # ==============================
+        # SUMMARIZATION
+        # ==============================
+
+        if SUMMARIZER_AVAILABLE:
+            try:
+                summary = summarize_complaint(description)
+            except Exception as e:
+                print(f"[ERROR] Summarization failed: {e}")
+                summary = (
+                    description[:100] + "..."
+                    if len(description) > 100
+                    else description
+                )
+        else:
+            summary = (
+                description[:100] + "..."
+                if len(description) > 100
+                else description
+            )
 
         # ==============================
         # IMAGE UPLOAD + VISION ANALYSIS
@@ -272,7 +339,6 @@ def create_complaint():
                     except Exception as e:
                         print(f"[ERROR] Vision analysis failed: {e}")
                         vision_result = None
-
             else:
                 db.session.rollback()
                 flash("Invalid image format. Use JPG, PNG, or WEBP.", "danger")
@@ -299,7 +365,6 @@ def create_complaint():
                     file_type="VIDEO"
                 )
                 db.session.add(media)
-
             else:
                 db.session.rollback()
                 flash("Invalid video format. Use MP4, AVI, MOV, or MKV.", "danger")
@@ -359,6 +424,15 @@ def create_complaint():
             vision_issue=vision_issue
         )
 
+        # Detect multiple civic issues in the complaint
+        detected_issues = detect_multiple_issues(description)
+
+        # Convert detected issues into departments
+        multi_department_result = assign_multiple_departments(detected_issues)
+
+        lead_department_name = multi_department_result["lead_department"]
+        supporting_department_names = multi_department_result["supporting_departments"]
+
         # ==============================
         # UPDATE COMPLAINT
         # ==============================
@@ -415,6 +489,44 @@ def create_complaint():
             f"Source: {fusion['source']}"
         )
 
+        # Store lead and supporting departments
+        all_department_names = []
+
+        if lead_department_name:
+            all_department_names.append(
+                ("LEAD", lead_department_name)
+            )
+
+        for department_name in supporting_department_names:
+            all_department_names.append(
+                ("SUPPORTING", department_name)
+            )
+
+        for role, department_name in all_department_names:
+            department = Department.query.filter_by(
+                department_name=department_name
+            ).first()
+
+            if not department:
+                continue
+
+            task_description = None
+
+            if role == "LEAD":
+                task_description = "Coordinate the complete complaint and monitor supporting departments."
+            else:
+                task_description = f"Handle the {department_name} related issue."
+
+            complaint_department = ComplaintDepartment(
+                complaint_id=complaint.complaint_id,
+                department_id=department.department_id,
+                role=role,
+                status="PENDING",
+                task_description=task_description
+            )
+
+            db.session.add(complaint_department)
+
         # ==============================
         # COMMIT
         # ==============================
@@ -457,7 +569,6 @@ def create_complaint():
                     complaint.complaint_id,
                     priority_result["priority"]
                 )
-
         except Exception as e:
             print(f"[WARNING] Notification error: {e}")
 
@@ -471,31 +582,6 @@ def create_complaint():
 
     # GET request
     return render_template("complaints/create.html")
-
-
-# ==============================
-# MY COMPLAINTS
-# ==============================
-
-@complaint_bp.route("/my")
-def my_complaints():
-
-    if "user_id" not in session:
-        return redirect(url_for("auth.login"))
-
-    complaints = Complaint.query.filter_by(
-        user_id=session["user_id"]
-    ).order_by(
-        Complaint.created_at.desc()
-    ).all()
-
-    return render_template(
-        "complaints/my_complaints.html",
-        complaints=complaints,
-        get_status_badge=get_status_badge_class,
-        get_priority_badge=get_priority_badge_class
-    )
-
 
 # ==============================
 # COMPLAINT DETAIL
@@ -530,12 +616,21 @@ def complaint_detail(complaint_id):
         complaint_id=complaint_id
     ).first()
 
+    # Get lead and supporting departments
+    complaint_departments = ComplaintDepartment.query.filter_by(
+        complaint_id=complaint_id
+    ).order_by(
+        ComplaintDepartment.role.asc(),
+        ComplaintDepartment.created_at.asc()
+    ).all()
+
     return render_template(
         "complaints/detail.html",
         complaint=complaint,
         ai_result=ai_result,
         history=history,
         feedback=feedback,
+        complaint_departments=complaint_departments,
         get_status_badge=get_status_badge_class,
         get_priority_badge=get_priority_badge_class
     )
@@ -652,3 +747,32 @@ def submit_feedback(complaint_id):
 
     flash("Thank you for your feedback!", "success")
     return redirect(url_for("complaint.complaint_detail", complaint_id=complaint_id))
+
+
+# ==============================
+# MY COMPLAINTS
+# ==============================
+
+@complaint_bp.route("/my")
+def my_complaints():
+
+    if "user_id" not in session:
+        return redirect(url_for("auth.login"))
+
+    complaints = Complaint.query.filter_by(
+        user_id=session["user_id"]
+    ).order_by(
+        Complaint.created_at.desc()
+    ).all()
+
+    return render_template(
+        "complaints/my_complaints.html",
+        complaints=complaints,
+        get_status_badge=get_status_badge_class,
+        get_priority_badge=get_priority_badge_class
+    )
+
+
+
+
+
