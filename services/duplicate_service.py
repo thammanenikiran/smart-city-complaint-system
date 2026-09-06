@@ -1,14 +1,36 @@
 """
 Duplicate Detection Service
 
-Calculates semantic similarity between a new complaint description and existing complaints
-to detect duplicates and link them.
+Lightweight duplicate detection for Railway deployment.
+Uses text similarity instead of loading a large embedding model.
 """
 
-from typing import Optional, List, Tuple
+from typing import Optional, Tuple
+from difflib import SequenceMatcher
+
 from models.complaint import Complaint
-from services.similarity_service import embedding_model, is_duplicate, calculate_similarity
-from sklearn.metrics.pairwise import cosine_similarity
+
+
+def calculate_text_similarity(text1: str, text2: str) -> float:
+    """
+    Calculate similarity between two complaint descriptions.
+
+    Returns:
+        Similarity score from 0 to 100.
+    """
+
+    if not text1 or not text2:
+        return 0.0
+
+    text1 = " ".join(text1.lower().strip().split())
+    text2 = " ".join(text2.lower().strip().split())
+
+    if not text1 or not text2:
+        return 0.0
+
+    score = SequenceMatcher(None, text1, text2).ratio()
+
+    return round(score * 100, 2)
 
 
 def check_for_duplicates(
@@ -18,20 +40,25 @@ def check_for_duplicates(
     threshold: float = 85.0
 ) -> Tuple[bool, Optional[int], float]:
     """
-    Check if a complaint description is semantically similar to recent complaints.
+    Check whether a complaint is similar to an existing complaint.
 
-    Returns:
-        tuple: (is_duplicate: bool, duplicate_of_id: Optional[int], best_score: float)
+    Uses lightweight text similarity to avoid memory-heavy
+    SentenceTransformer inference on Railway.
     """
+
     if not description or not description.strip():
         return False, None, 0.0
 
     query = Complaint.query
+
     if exclude_complaint_id:
-        query = query.filter(Complaint.complaint_id != exclude_complaint_id)
+        query = query.filter(
+            Complaint.complaint_id != exclude_complaint_id
+        )
 
     recent_complaints = (
-        query.order_by(Complaint.created_at.desc())
+        query
+        .order_by(Complaint.created_at.desc())
         .limit(limit)
         .all()
     )
@@ -40,45 +67,32 @@ def check_for_duplicates(
         return False, None, 0.0
 
     valid_candidates = [
-        c for c in recent_complaints if c.description and c.description.strip()
+        complaint
+        for complaint in recent_complaints
+        if complaint.description
+        and complaint.description.strip()
     ]
 
     if not valid_candidates:
         return False, None, 0.0
 
-    try:
-        # Encode target text once and all candidate descriptions in one batch for performance
-        target_embedding = embedding_model.encode([description.strip()])
-        candidate_texts = [c.description.strip() for c in valid_candidates]
-        candidate_embeddings = embedding_model.encode(candidate_texts)
+    best_match_id = None
+    best_score = 0.0
 
-        # Compute cosine similarity
-        similarities = cosine_similarity(target_embedding, candidate_embeddings)[0]
+    for candidate in valid_candidates:
 
-        best_idx = int(similarities.argmax())
-        best_score = round(float(similarities[best_idx]) * 100, 2)
-        best_match = valid_candidates[best_idx]
+        score = calculate_text_similarity(
+            description,
+            candidate.description
+        )
 
-        is_dup = best_score >= threshold
+        if score > best_score:
+            best_score = score
+            best_match_id = candidate.complaint_id
 
-        if is_dup:
-            return True, best_match.complaint_id, best_score
-        else:
-            return False, None, best_score
+    is_duplicate = best_score >= threshold
 
-    except Exception as e:
-        print(f"[WARNING] Batch similarity detection failed: {e}. Falling back to single comparisons.")
-        best_match_id = None
-        best_score = 0.0
+    if is_duplicate:
+        return True, best_match_id, best_score
 
-        for candidate in valid_candidates:
-            try:
-                score = calculate_similarity(description, candidate.description)
-                if score > best_score:
-                    best_score = score
-                    best_match_id = candidate.complaint_id
-            except Exception:
-                continue
-
-        is_dup = best_score >= threshold
-        return is_dup, (best_match_id if is_dup else None), best_score
+    return False, None, best_score
